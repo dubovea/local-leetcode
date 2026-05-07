@@ -50,6 +50,7 @@ export function CreateManualProblemForm({
       functionName: cleanFunctionName,
       judgeMode: "exact",
       descriptionMarkdown: `# ${problemNumber}. ${cleanTitle}\n\nWrite the problem description in Markdown.`,
+      notesMarkdown: "",
       code: `/**\n * Write your solution here.\n */\nvar ${cleanFunctionName} = function (...args) {\n  console.log(args);\n};`,
       testCases: [{ id: createId("case"), input: "", expected: "undefined" }],
       submissions: [],

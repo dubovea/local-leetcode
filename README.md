@@ -1,6 +1,6 @@
 # Local LeetCode
 
-Минимальный локальный LeetCode для JavaScript-задач: Markdown-описание, Monaco Editor, TestCase, Run/Submit и история решений.
+Минимальный локальный LeetCode для JavaScript-задач: Markdown-описание, Monaco Editor, TestCase, Run/Submit, история решений и локальный бэкап.
 
 ## Запуск
 
@@ -18,18 +18,27 @@ npm run dev
   - `Manual problem` — добавить ручную задачу;
   - иконка `Upload` — импортировать `neenza` JSON;
   - иконка `Trash` — очистить список и вернуться к seed-задачам;
+- отдельные кнопки `Export backup` / `Import backup` для своих задач, решений, черновиков и заметок;
 - по умолчанию есть только одна задача — ручная `Group Anagrams`;
 - две категории задач:
   - `LeetCode problems` — задачи из импорта;
   - `Manual problems` — задачи, добавленные вручную и стартовая `Group Anagrams`;
+- категории можно свернуть/развернуть;
 - поиск по номеру, названию и slug;
+- фильтр задач: все / нерешённые / решённые;
 - Markdown-описание задачи;
+- поле `Notes` для идеи, edge cases и complexity;
 - вкладки `Description` и `Solutions`;
-- история всех `Submit` с датой, временем, статусом, runtime и кодом;
+- история всех `Submit` с датой, временем, статусом, runtime, кейсами и кодом;
+- из `Solutions` можно восстановить старое решение в редактор или удалить попытку;
 - Monaco Editor для JavaScript;
 - `Alt + Shift + F` — форматирование кода;
-- `Ctrl + Enter` — запуск;
-- TestCase в стиле LeetCode: `Input`, `Expected`, `Output`.
+- `Ctrl + Enter` — запуск текущего testcase;
+- TestCase в стиле LeetCode: `Input`, `Expected`, `Output`;
+- несколько testcase на задачу;
+- `Run Case` — запускает выбранный testcase;
+- `Run All` — запускает все testcase без сохранения в Solutions;
+- `Submit All` — запускает все testcase и сохраняет попытку в Solutions.
 
 ## Что изменено для производительности
 
@@ -70,6 +79,17 @@ src/entities/problem/model/generatedNeenzaProblems.ts
 ```bash
 npm run dev
 ```
+
+## Бэкап
+
+Drawer содержит:
+
+```txt
+Export backup
+Import backup
+```
+
+Бэкап сохраняет все локальные данные приложения: задачи, код, testcase, заметки и историю решений.
 
 ## Что делает конвертер neenza
 

@@ -3,6 +3,7 @@ import type { Problem } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
 import { MarkdownView } from "@/shared/ui/MarkdownView";
 import { Button } from "@/shared/ui/button";
+import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/shared/lib/cn";
 import { SolutionsHistory } from "@/features/solutions-history/ui/SolutionsHistory";
 
@@ -11,9 +12,13 @@ type Tab = "description" | "solutions";
 export function ProblemDescriptionPanel({
   problem,
   onChange,
+  onRestoreSubmission,
+  onDeleteSubmission,
 }: {
   problem: Problem;
   onChange: (problem: Problem) => void;
+  onRestoreSubmission: (submissionId: string) => void;
+  onDeleteSubmission: (submissionId: string) => void;
 }) {
   const [tab, setTab] = useState<Tab>("description");
   const [editingMarkdown, setEditingMarkdown] = useState(false);
@@ -59,8 +64,8 @@ export function ProblemDescriptionPanel({
             </div>
 
             {editingMarkdown ? (
-              <textarea
-                className="min-h-[560px] w-full resize-y rounded-lg border border-[#303030] bg-[#262626] p-4 font-mono text-sm leading-6 text-[#f1f1f1] focus:border-[#555]"
+              <Textarea
+                className="min-h-[420px] resize-y font-mono leading-6"
                 value={problem.descriptionMarkdown}
                 onChange={(event) => onChange({ ...problem, descriptionMarkdown: event.target.value })}
                 spellCheck={false}
@@ -68,9 +73,20 @@ export function ProblemDescriptionPanel({
             ) : (
               <MarkdownView markdown={problem.descriptionMarkdown} />
             )}
+
+            <div className="mt-6 border-t border-[#303030] pt-5">
+              <div className="mb-2 text-sm font-semibold text-[#f1f1f1]">Notes</div>
+              <Textarea
+                className="min-h-40 resize-y font-mono leading-6"
+                placeholder="Write your idea, edge cases, or complexity notes here..."
+                value={problem.notesMarkdown ?? ""}
+                onChange={(event) => onChange({ ...problem, notesMarkdown: event.target.value })}
+                spellCheck={false}
+              />
+            </div>
           </div>
         ) : (
-          <SolutionsHistory submissions={problem.submissions} />
+          <SolutionsHistory submissions={problem.submissions} onRestore={onRestoreSubmission} onDelete={onDeleteSubmission} />
         )}
       </div>
     </section>

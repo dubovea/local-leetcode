@@ -61,7 +61,7 @@ function problemToListItem(problem: Problem): ProblemListItem {
     title: problem.title,
     slug: problem.slug,
     difficulty: problem.difficulty,
-    solved: problem.submissions.some((submission) => submission.status === "accepted"),
+    solved: (problem.submissions ?? []).some((submission) => submission.status === "accepted"),
   };
 }
 

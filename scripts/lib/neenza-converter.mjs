@@ -189,6 +189,7 @@ function problemFromNeenza(problem) {
     slug,
     difficulty: normalizeDifficulty(problem.difficulty),
     descriptionMarkdown: buildDescriptionMarkdown(problem, title, number),
+    notesMarkdown: "",
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,

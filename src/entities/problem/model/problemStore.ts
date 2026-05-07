@@ -12,9 +12,9 @@ import {
   sortProblemIndex,
   toProblemListItem,
 } from "./problemDb";
-import type { Problem, ProblemListItem, Submission } from "./types";
+import type { Problem, ProblemListItem, ProblemsBackup, Submission } from "./types";
 
-const SELECTED_PROBLEM_KEY = "local-leetcode:v10:selected-problem-id";
+const SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
 
 function getSeedProblems() {
   return [...generatedNeenzaProblems, ...defaultProblems];
@@ -28,17 +28,35 @@ function saveSelectedProblemId(problemId: string) {
   localStorage.setItem(SELECTED_PROBLEM_KEY, problemId);
 }
 
+function normalizeProblem(problem: Problem): Problem {
+  return {
+    ...problem,
+    notesMarkdown: problem.notesMarkdown ?? "",
+    submissions: problem.submissions ?? [],
+    testCases: problem.testCases ?? [],
+  };
+}
+
 function mergeProblem(existing: Problem | undefined, incoming: Problem): Problem {
   if (!existing) {
-    return incoming;
+    return normalizeProblem(incoming);
   }
 
-  return {
+  return normalizeProblem({
     ...incoming,
     source: existing.source ?? incoming.source,
     code: existing.code || incoming.code,
+    notesMarkdown: existing.notesMarkdown ?? incoming.notesMarkdown ?? "",
     testCases: existing.testCases.length > 0 ? existing.testCases : incoming.testCases,
     submissions: existing.submissions.length > 0 ? existing.submissions : incoming.submissions,
+  });
+}
+
+function buildBackup(problems: Problem[]): ProblemsBackup {
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    problems: problems.map(normalizeProblem),
   };
 }
 
@@ -54,8 +72,12 @@ type ProblemStore = {
   updateActiveProblem: (problem: Problem) => Promise<void>;
   saveProblemCode: (problemId: string, code: string) => Promise<void>;
   addSubmission: (problemId: string, submission: Submission, code: string) => Promise<void>;
+  deleteSubmission: (problemId: string, submissionId: string) => Promise<void>;
+  restoreSubmissionCode: (problemId: string, submissionId: string) => Promise<string | null>;
   addManualProblem: (problem: Problem) => Promise<void>;
   importProblems: (problems: Problem[]) => Promise<void>;
+  exportBackup: () => Promise<ProblemsBackup>;
+  importBackup: (backup: ProblemsBackup | Problem[]) => Promise<void>;
   resetProblems: () => Promise<void>;
 };
 
@@ -71,7 +93,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       const hasStoredProblems = await hasProblemsInDb();
 
       if (!hasStoredProblems) {
-        await putProblemsToDb(getSeedProblems());
+        await putProblemsToDb(getSeedProblems().map(normalizeProblem));
       }
 
       const index = await getProblemIndexFromDb();
@@ -86,7 +108,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       }
 
       set({
-        activeProblem: activeProblem ?? null,
+        activeProblem: activeProblem ? normalizeProblem(activeProblem) : null,
         activeProblemId,
         errorText: "",
         hydrated: true,
@@ -108,17 +130,19 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }
 
     saveSelectedProblemId(problemId);
-    set({ activeProblem: problem, activeProblemId: problemId });
+    set({ activeProblem: normalizeProblem(problem), activeProblemId: problemId });
   },
 
   async updateActiveProblem(problem) {
-    await putProblemToDb(problem);
+    const nextProblem = normalizeProblem(problem);
+
+    await putProblemToDb(nextProblem);
 
     set((state) => ({
-      activeProblem: state.activeProblemId === problem.id ? problem : state.activeProblem,
+      activeProblem: state.activeProblemId === problem.id ? nextProblem : state.activeProblem,
       problemIndex: sortProblemIndex([
         ...state.problemIndex.filter((item) => item.id !== problem.id),
-        toProblemListItem(problem),
+        toProblemListItem(nextProblem),
       ]),
     }));
   },
@@ -130,7 +154,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       return;
     }
 
-    await putProblemToDb({ ...problem, code });
+    await putProblemToDb(normalizeProblem({ ...problem, code }));
   },
 
   async addSubmission(problemId, submission, code) {
@@ -140,11 +164,11 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       return;
     }
 
-    const nextProblem = {
+    const nextProblem = normalizeProblem({
       ...problem,
       code,
-      submissions: [...problem.submissions, submission],
-    };
+      submissions: [...(problem.submissions ?? []), submission],
+    });
 
     await putProblemToDb(nextProblem);
 
@@ -157,23 +181,71 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }));
   },
 
-  async addManualProblem(problem) {
-    await putProblemToDb(problem);
-    saveSelectedProblemId(problem.id);
+  async deleteSubmission(problemId, submissionId) {
+    const problem = await getProblemFromDb(problemId);
+
+    if (!problem) {
+      return;
+    }
+
+    const nextProblem = normalizeProblem({
+      ...problem,
+      submissions: (problem.submissions ?? []).filter((submission) => submission.id !== submissionId),
+    });
+
+    await putProblemToDb(nextProblem);
 
     set((state) => ({
-      activeProblem: problem,
-      activeProblemId: problem.id,
+      activeProblem: state.activeProblemId === problemId ? nextProblem : state.activeProblem,
       problemIndex: sortProblemIndex([
-        ...state.problemIndex.filter((item) => item.id !== problem.id),
-        toProblemListItem(problem),
+        ...state.problemIndex.filter((item) => item.id !== problemId),
+        toProblemListItem(nextProblem),
+      ]),
+    }));
+  },
+
+  async restoreSubmissionCode(problemId, submissionId) {
+    const problem = await getProblemFromDb(problemId);
+    const submission = problem ? (problem.submissions ?? []).find((item) => item.id === submissionId) : undefined;
+
+    if (!problem || !submission) {
+      return null;
+    }
+
+    const nextProblem = normalizeProblem({ ...problem, code: submission.code });
+
+    await putProblemToDb(nextProblem);
+
+    set((state) => ({
+      activeProblem: state.activeProblemId === problemId ? nextProblem : state.activeProblem,
+      problemIndex: sortProblemIndex([
+        ...state.problemIndex.filter((item) => item.id !== problemId),
+        toProblemListItem(nextProblem),
+      ]),
+    }));
+
+    return submission.code;
+  },
+
+  async addManualProblem(problem) {
+    const nextProblem = normalizeProblem(problem);
+
+    await putProblemToDb(nextProblem);
+    saveSelectedProblemId(nextProblem.id);
+
+    set((state) => ({
+      activeProblem: nextProblem,
+      activeProblemId: nextProblem.id,
+      problemIndex: sortProblemIndex([
+        ...state.problemIndex.filter((item) => item.id !== nextProblem.id),
+        toProblemListItem(nextProblem),
       ]),
     }));
   },
 
   async importProblems(problems) {
     const existingProblems = await getAllProblemsFromDb();
-    const existingById = new Map(existingProblems.map((problem) => [problem.id, problem]));
+    const existingById = new Map(existingProblems.map((problem) => [problem.id, normalizeProblem(problem)]));
     const mergedProblems = problems.map((problem) => mergeProblem(existingById.get(problem.id), problem));
 
     await putProblemsToDb(mergedProblems);
@@ -192,9 +264,16 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     });
   },
 
-  async resetProblems() {
+  async exportBackup() {
+    return buildBackup(await getAllProblemsFromDb());
+  },
+
+  async importBackup(backup) {
+    const problems = Array.isArray(backup) ? backup : backup.problems;
+    const normalizedProblems = problems.map(normalizeProblem);
+
     await clearProblemsDb();
-    await putProblemsToDb(getSeedProblems());
+    await putProblemsToDb(normalizedProblems);
 
     const index = await getProblemIndexFromDb();
     const activeProblem = index[0] ? await getProblemFromDb(index[0].id) : null;
@@ -204,7 +283,26 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }
 
     set({
-      activeProblem: activeProblem ?? null,
+      activeProblem: activeProblem ? normalizeProblem(activeProblem) : null,
+      activeProblemId: activeProblem?.id ?? null,
+      errorText: "",
+      problemIndex: index,
+    });
+  },
+
+  async resetProblems() {
+    await clearProblemsDb();
+    await putProblemsToDb(getSeedProblems().map(normalizeProblem));
+
+    const index = await getProblemIndexFromDb();
+    const activeProblem = index[0] ? await getProblemFromDb(index[0].id) : null;
+
+    if (activeProblem) {
+      saveSelectedProblemId(activeProblem.id);
+    }
+
+    set({
+      activeProblem: activeProblem ? normalizeProblem(activeProblem) : null,
       activeProblemId: activeProblem?.id ?? null,
       errorText: "",
       problemIndex: index,

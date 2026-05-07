@@ -293,6 +293,7 @@ function problemFromNeenza(problem: NeenzaProblem): Problem | null {
     slug,
     difficulty: DIFFICULTIES.includes(problem.difficulty as Difficulty) ? (problem.difficulty as Difficulty) : normalizeDifficulty(problem.difficulty),
     descriptionMarkdown: buildDescriptionMarkdown(problem, title, number),
+    notesMarkdown: "",
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,

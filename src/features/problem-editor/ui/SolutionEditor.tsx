@@ -11,9 +11,11 @@ export function SolutionEditor({
   onChange,
   onDraftChange,
   onRun,
+  resetKey,
 }: {
   problemId: string;
   initialCode: string;
+  resetKey: number;
   onChange: (problemId: string, code: string) => void;
   onDraftChange: (problemId: string, code: string) => void;
   onRun: () => void;
@@ -26,6 +28,7 @@ export function SolutionEditor({
   const pendingSaveRef = useRef<{ problemId: string; code: string } | null>(null);
   const problemIdRef = useRef(problemId);
   const lastEditorProblemIdRef = useRef(problemId);
+  const lastResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
     runRef.current = onRun;
@@ -66,7 +69,14 @@ export function SolutionEditor({
 
     problemIdRef.current = problemId;
 
-    if (!editor || lastEditorProblemIdRef.current === problemId) {
+    if (!editor) {
+      return;
+    }
+
+    const problemChanged = lastEditorProblemIdRef.current !== problemId;
+    const resetRequested = lastResetKeyRef.current !== resetKey;
+
+    if (!problemChanged && !resetRequested) {
       return;
     }
 
@@ -81,8 +91,10 @@ export function SolutionEditor({
     }
 
     editor.setValue(initialCode);
+    draftChangeRef.current(problemId, initialCode);
     lastEditorProblemIdRef.current = problemId;
-  }, [initialCode, problemId]);
+    lastResetKeyRef.current = resetKey;
+  }, [initialCode, problemId, resetKey]);
 
   useEffect(() => {
     return () => {

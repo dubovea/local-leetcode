@@ -28,11 +28,11 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button className="min-w-20" disabled={running} onClick={onRun}>
-          ▶ Run
+        <Button className="min-w-24" disabled={running} onClick={onRun}>
+          ▶ Run Case
         </Button>
         <Button className="min-w-24" disabled={running} onClick={onSubmit} variant="success">
-          Submit
+          Submit All
         </Button>
       </div>
 

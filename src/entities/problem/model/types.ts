@@ -58,6 +58,7 @@ export type Problem = {
   slug: string;
   difficulty: Difficulty;
   descriptionMarkdown: string;
+  notesMarkdown?: string;
   functionName: string;
   judgeMode: JudgeMode;
   code: string;
@@ -91,4 +92,10 @@ export type RunRequest = {
   functionName: string;
   judgeMode: JudgeMode;
   testCases: TestCase[];
+};
+
+export type ProblemsBackup = {
+  version: 1;
+  exportedAt: string;
+  problems: Problem[];
 };

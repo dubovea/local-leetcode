@@ -11,23 +11,27 @@ export function CodeWorkspace({
   result,
   bottomTab,
   activeCaseId,
+  editorResetKey,
   onBottomTabChange,
   onActiveCaseChange,
   onProblemChange,
   onCodeChange,
   onCodeDraftChange,
-  onRun,
+  onRunCurrent,
+  onRunAll,
 }: {
   problem: Problem;
   result: RunResult | null;
   bottomTab: BottomTab;
   activeCaseId?: string;
+  editorResetKey: number;
   onBottomTabChange: (tab: BottomTab) => void;
   onActiveCaseChange: (id: string) => void;
   onProblemChange: (problem: Problem) => void;
   onCodeChange: (problemId: string, code: string) => void;
   onCodeDraftChange: (problemId: string, code: string) => void;
-  onRun: () => void;
+  onRunCurrent: () => void;
+  onRunAll: () => void;
 }) {
   function updateTestCases(testCases: TestCase[]) {
     onProblemChange({ ...problem, testCases });
@@ -41,16 +45,13 @@ export function CodeWorkspace({
             <span className="text-[#2db55d]">&lt;/&gt;</span>
             Code
           </div>
-          <div className="flex items-center gap-2 text-xs text-[#8f8f8f]">
-            <span>JavaScript</span>
-            <span>⌥⇧F Format</span>
-          </div>
         </div>
         <div className="h-[calc(100%-44px)]">
           <SolutionEditor
             initialCode={problem.code}
             problemId={problem.id}
-            onRun={onRun}
+            resetKey={editorResetKey}
+            onRun={onRunCurrent}
             onDraftChange={onCodeDraftChange}
             onChange={onCodeChange}
           />
@@ -58,21 +59,31 @@ export function CodeWorkspace({
       </div>
 
       <div className="min-h-0 overflow-hidden rounded-lg border border-[#303030] bg-[#1f1f1f]">
-        <div className="flex h-11 items-center gap-2 border-b border-[#303030] bg-[#252525] px-3">
-          <Button
-            className="h-7 px-2 text-xs"
-            onClick={() => onBottomTabChange("testcase")}
-            variant={bottomTab === "testcase" ? "default" : "ghost"}
-          >
-            Testcase
-          </Button>
-          <Button
-            className="h-7 px-2 text-xs"
-            onClick={() => onBottomTabChange("result")}
-            variant={bottomTab === "result" ? "default" : "ghost"}
-          >
-            Test Result
-          </Button>
+        <div className="flex h-11 items-center justify-between border-b border-[#303030] bg-[#252525] px-3">
+          <div className="flex items-center gap-2">
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={() => onBottomTabChange("testcase")}
+              variant={bottomTab === "testcase" ? "default" : "ghost"}
+            >
+              Testcase
+            </Button>
+            <Button
+              className="h-7 px-2 text-xs"
+              onClick={() => onBottomTabChange("result")}
+              variant={bottomTab === "result" ? "default" : "ghost"}
+            >
+              Test Result
+            </Button>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button className="h-7 px-2 text-xs" variant="secondary" onClick={onRunCurrent}>
+              Run Case
+            </Button>
+            <Button className="h-7 px-2 text-xs" variant="secondary" onClick={onRunAll}>
+              Run All
+            </Button>
+          </div>
         </div>
         <div className="h-[calc(100%-44px)]">
           {bottomTab === "testcase" ? (

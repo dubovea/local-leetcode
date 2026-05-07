@@ -1,31 +1,86 @@
 import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import { CheckCircle2, Circle, Plus, Search, Trash2, X } from "lucide-react";
-import type { Problem, ProblemListItem } from "@/entities/problem/model/types";
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  ListFilter,
+  Plus,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
+import type { Problem, ProblemListItem, ProblemsBackup } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
 import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Input } from "@/shared/ui/input";
 import { ImportProblemsButton } from "@/features/import-problems/ui/ImportProblemsButton";
 import { CreateManualProblemForm } from "@/features/manual-problem/ui/CreateManualProblemForm";
+import { BackupButtons } from "@/features/backup-problems/ui/BackupButtons";
+
+type StatusFilter = "all" | "solved" | "unsolved";
+
+const statusFilterTitle: Record<StatusFilter, string> = {
+  all: "Show all problems",
+  solved: "Show solved problems",
+  unsolved: "Show unsolved problems",
+};
 
 function Section({
   title,
   count,
+  open,
   children,
+  onOpenChange,
 }: {
   title: string;
   count: number;
+  open: boolean;
   children: ReactNode;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const ChevronIcon = open ? ChevronDown : ChevronRight;
+
+  return (
+    <Collapsible className="mb-4" open={open} onOpenChange={onOpenChange}>
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-[#151515] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[#8f8f8f]">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-[#222]">
+          <ChevronIcon className="h-4 w-4 shrink-0" />
+          <span className="truncate">{title}</span>
+        </CollapsibleTrigger>
+        <span className="ml-2 rounded-full bg-[#222] px-2 py-0.5 text-[11px] text-[#9f9f9f]">{count}</span>
+      </div>
+      <CollapsibleContent>{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+function FilterButton({
+  active,
+  title,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  children: ReactNode;
+  onClick: () => void;
 }) {
   return (
-    <section className="mb-4">
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-[#151515] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[#8f8f8f]">
-        <span>{title}</span>
-        <span>{count}</span>
-      </div>
-      <div>{children}</div>
-    </section>
+    <Button
+      aria-label={title}
+      aria-pressed={active}
+      className={cn(active ? "border-[#4d4d4d] bg-[#333] text-[#f1f1f1]" : "")}
+      size="icon"
+      title={title}
+      variant={active ? "secondary" : "ghost"}
+      onClick={onClick}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -59,6 +114,18 @@ function ProblemRow({
   );
 }
 
+function applyStatusFilter(items: ProblemListItem[], statusFilter: StatusFilter) {
+  if (statusFilter === "solved") {
+    return items.filter((item) => item.solved);
+  }
+
+  if (statusFilter === "unsolved") {
+    return items.filter((item) => !item.solved);
+  }
+
+  return items;
+}
+
 export function ProblemListDrawer({
   open,
   problemIndex,
@@ -68,6 +135,8 @@ export function ProblemListDrawer({
   onCreateManual,
   onImportProblems,
   onResetProblems,
+  onExportBackup,
+  onImportBackup,
 }: {
   open: boolean;
   problemIndex: ProblemListItem[];
@@ -77,10 +146,16 @@ export function ProblemListDrawer({
   onCreateManual: (problem: Problem) => void;
   onImportProblems: (problems: Problem[]) => void;
   onResetProblems: () => void;
+  onExportBackup: () => Promise<ProblemsBackup>;
+  onImportBackup: (backup: ProblemsBackup | Problem[]) => Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [creatingManual, setCreatingManual] = useState(false);
   const [importStatus, setImportStatus] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [leetcodeOpen, setLeetcodeOpen] = useState(true);
+  const [manualOpen, setManualOpen] = useState(true);
+
   const solvedCount = useMemo(() => problemIndex.filter((problem) => problem.solved).length, [problemIndex]);
   const nextManualNumber = useMemo(() => {
     const manualNumbers = problemIndex.filter((problem) => problem.source === "manual").map((problem) => problem.number);
@@ -90,7 +165,7 @@ export function ProblemListDrawer({
 
   const filteredIndex = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
-    const result = normalizedQuery
+    const queryResult = normalizedQuery
       ? problemIndex.filter((item) => {
           return (
             item.title.toLowerCase().includes(normalizedQuery) ||
@@ -100,11 +175,13 @@ export function ProblemListDrawer({
         })
       : problemIndex;
 
+    const statusResult = applyStatusFilter(queryResult, statusFilter);
+
     return {
-      leetcode: result.filter((item) => item.source !== "manual"),
-      manual: result.filter((item) => item.source === "manual"),
+      leetcode: statusResult.filter((item) => item.source !== "manual"),
+      manual: statusResult.filter((item) => item.source === "manual"),
     };
-  }, [problemIndex, query]);
+  }, [problemIndex, query, statusFilter]);
 
   function resetProblems() {
     const confirmed = window.confirm("Delete all imported and manual problems? The default manual Group Anagrams task will remain.");
@@ -159,7 +236,9 @@ export function ProblemListDrawer({
             </Button>
           </div>
 
-          {importStatus ? <div className="mb-3 text-xs text-[#8f8f8f]">{importStatus}</div> : null}
+          <BackupButtons onExport={onExportBackup} onImport={onImportBackup} onStatusChange={setImportStatus} />
+
+          {importStatus ? <div className="mt-3 mb-3 text-xs text-[#8f8f8f]">{importStatus}</div> : null}
 
           {creatingManual ? (
             <div className="mb-3">
@@ -174,19 +253,41 @@ export function ProblemListDrawer({
             </div>
           ) : null}
 
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777]" />
-            <Input
-              className="rounded-full pl-9"
-              placeholder="Search questions"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777]" />
+              <Input
+                className="rounded-full pl-9"
+                placeholder="Search questions"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+
+            <div className="flex shrink-0 items-center rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] p-0.5">
+              <FilterButton active={statusFilter === "all"} title={statusFilterTitle.all} onClick={() => setStatusFilter("all")}>
+                <ListFilter className="h-4 w-4" />
+              </FilterButton>
+              <FilterButton
+                active={statusFilter === "unsolved"}
+                title={statusFilterTitle.unsolved}
+                onClick={() => setStatusFilter("unsolved")}
+              >
+                <Circle className="h-4 w-4" />
+              </FilterButton>
+              <FilterButton
+                active={statusFilter === "solved"}
+                title={statusFilterTitle.solved}
+                onClick={() => setStatusFilter("solved")}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+              </FilterButton>
+            </div>
           </div>
         </div>
 
         <div className="flex-1 overflow-auto p-2">
-          <Section count={filteredIndex.leetcode.length} title="LeetCode problems">
+          <Section count={filteredIndex.leetcode.length} open={leetcodeOpen} title="LeetCode problems" onOpenChange={setLeetcodeOpen}>
             {filteredIndex.leetcode.length === 0 ? (
               <div className="px-3 py-4 text-sm text-[#777]">Import neenza JSON to add LeetCode problems.</div>
             ) : (
@@ -196,7 +297,7 @@ export function ProblemListDrawer({
             )}
           </Section>
 
-          <Section count={filteredIndex.manual.length} title="Manual problems">
+          <Section count={filteredIndex.manual.length} open={manualOpen} title="Manual problems" onOpenChange={setManualOpen}>
             {filteredIndex.manual.length === 0 ? (
               <div className="px-3 py-4 text-sm text-[#777]">Manual problems will appear here.</div>
             ) : (
