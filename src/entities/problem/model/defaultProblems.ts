@@ -8,6 +8,7 @@ export const defaultProblems: Problem[] = [
     title: "Group Anagrams",
     slug: "manual-group-anagrams",
     difficulty: "Medium",
+    topics: ["Array", "Hash Table", "String", "Sorting"],
     notesMarkdown: "",
     functionName: "groupAnagrams",
     judgeMode: "unordered-array",

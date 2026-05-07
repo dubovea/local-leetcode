@@ -1,6 +1,9 @@
 import { writeFile } from "node:fs/promises";
 
-const OUTPUT = new URL("../src/entities/problem/model/generatedLeetcodeCatalog.ts", import.meta.url);
+const OUTPUT = new URL(
+  "../src/entities/problem/model/generatedLeetcodeCatalog.ts",
+  import.meta.url,
+);
 
 const difficultyByLevel = new Map([
   [1, "Easy"],
@@ -18,6 +21,24 @@ function titleFromSlug(slug) {
     .replace(/\bIi\b/g, "II")
     .replace(/\bIii\b/g, "III")
     .replace(/\bIv\b/g, "IV");
+}
+
+function normalizeTopics(item) {
+  const candidates = item.topicTags ?? item.topics ?? item.tags ?? [];
+
+  if (!Array.isArray(candidates)) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      candidates
+        .map((topic) => (typeof topic === "string" ? topic : (topic?.name ?? topic?.slug)))
+        .filter(Boolean)
+        .map((topic) => String(topic).trim())
+        .filter(Boolean),
+    ),
+  );
 }
 
 async function fetchJson(url, init) {
@@ -43,6 +64,7 @@ function fromLeetcodeApi(data) {
       title: item.stat.question__title,
       slug: item.stat.question__title_slug,
       difficulty: difficultyByLevel.get(item.difficulty?.level) ?? "Medium",
+      topics: normalizeTopics(item),
       paidOnly: Boolean(item.paid_only),
       url: `https://leetcode.com/problems/${item.stat.question__title_slug}/`,
     }))
@@ -59,7 +81,9 @@ function fromPublicApi(data) {
 
   return list
     .map((item) => {
-      const number = Number(item.frontendQuestionId ?? item.questionFrontendId ?? item.number ?? item.id);
+      const number = Number(
+        item.frontendQuestionId ?? item.questionFrontendId ?? item.number ?? item.id,
+      );
       const slug = item.titleSlug ?? item.slug ?? item.problem_slug;
       const difficulty = item.difficulty ?? "Medium";
 
@@ -69,7 +93,15 @@ function fromPublicApi(data) {
         number,
         title: item.title ?? titleFromSlug(slug ?? "problem"),
         slug,
-        difficulty: difficulty === "easy" ? "Easy" : difficulty === "medium" ? "Medium" : difficulty === "hard" ? "Hard" : difficulty,
+        difficulty:
+          difficulty === "easy"
+            ? "Easy"
+            : difficulty === "medium"
+              ? "Medium"
+              : difficulty === "hard"
+                ? "Hard"
+                : difficulty,
+        topics: normalizeTopics(item),
         paidOnly: Boolean(item.isPaidOnly ?? item.paidOnly ?? item.paid_only),
         url: `https://leetcode.com/problems/${slug}/`,
       };

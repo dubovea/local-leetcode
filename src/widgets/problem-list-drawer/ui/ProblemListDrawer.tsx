@@ -46,12 +46,14 @@ function Section({
 
   return (
     <Collapsible className="mb-4" open={open} onOpenChange={onOpenChange}>
-      <div className="sticky top-0 z-10 flex items-center justify-between bg-[#151515] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[#8f8f8f]">
-        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-[#222]">
+      <div className="sticky top-0 z-10 flex items-center justify-between bg-[var(--lc-page)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--lc-muted)]">
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-[var(--lc-hover)]">
           <ChevronIcon className="h-4 w-4 shrink-0" />
           <span className="truncate">{title}</span>
         </CollapsibleTrigger>
-        <span className="ml-2 rounded-full bg-[#222] px-2 py-0.5 text-[11px] text-[#9f9f9f]">{count}</span>
+        <span className="ml-2 rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-[11px] text-[var(--lc-muted)]">
+          {count}
+        </span>
       </div>
       <CollapsibleContent>{children}</CollapsibleContent>
     </Collapsible>
@@ -73,7 +75,11 @@ function FilterButton({
     <Button
       aria-label={title}
       aria-pressed={active}
-      className={cn(active ? "border-[#4d4d4d] bg-[#333] text-[#f1f1f1]" : "")}
+      className={cn(
+        active
+          ? "border-[var(--lc-border-strong)] bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
+          : "",
+      )}
       size="icon"
       title={title}
       variant={active ? "secondary" : "ghost"}
@@ -100,13 +106,18 @@ function ProblemRow({
     <button
       className={cn(
         "grid w-full grid-cols-[26px_1fr_auto] items-center gap-2 rounded-lg px-3 py-2.5 text-left text-sm transition-colors",
-        active ? "bg-[#2b2b2b]" : "hover:bg-[#242424]",
+        active ? "bg-[var(--lc-active)]" : "hover:bg-[var(--lc-hover)]",
       )}
       type="button"
       onClick={() => onSelect(item.id)}
     >
-      <StatusIcon className={cn("mx-auto h-4 w-4", item.solved ? "text-[#2db55d]" : "text-[#8b8b8b]")} />
-      <span className="truncate font-medium text-[#e0e0e0]">
+      <StatusIcon
+        className={cn(
+          "mx-auto h-4 w-4",
+          item.solved ? "text-[var(--lc-success)]" : "text-[var(--lc-subtle)]",
+        )}
+      />
+      <span className="truncate font-medium text-[var(--lc-text-strong)]">
         {item.number}. {item.title}
       </span>
       <DifficultyBadge difficulty={item.difficulty} />
@@ -156,9 +167,14 @@ export function ProblemListDrawer({
   const [leetcodeOpen, setLeetcodeOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
 
-  const solvedCount = useMemo(() => problemIndex.filter((problem) => problem.solved).length, [problemIndex]);
+  const solvedCount = useMemo(
+    () => problemIndex.filter((problem) => problem.solved).length,
+    [problemIndex],
+  );
   const nextManualNumber = useMemo(() => {
-    const manualNumbers = problemIndex.filter((problem) => problem.source === "manual").map((problem) => problem.number);
+    const manualNumbers = problemIndex
+      .filter((problem) => problem.source === "manual")
+      .map((problem) => problem.number);
 
     return Math.max(0, ...manualNumbers) + 1;
   }, [problemIndex]);
@@ -184,7 +200,9 @@ export function ProblemListDrawer({
   }, [problemIndex, query, statusFilter]);
 
   function resetProblems() {
-    const confirmed = window.confirm("Delete all imported and manual problems? The default manual Group Anagrams task will remain.");
+    const confirmed = window.confirm(
+      "Delete all imported and manual problems? The default manual Group Anagrams task will remain.",
+    );
 
     if (confirmed) {
       setCreatingManual(false);
@@ -196,20 +214,23 @@ export function ProblemListDrawer({
   return (
     <div className={cn("fixed inset-0 z-50 transition", open ? "visible" : "invisible")}>
       <div
-        className={cn("absolute inset-0 bg-black/60 transition-opacity", open ? "opacity-100" : "opacity-0")}
+        className={cn(
+          "absolute inset-0 bg-[var(--lc-backdrop)] transition-opacity",
+          open ? "opacity-100" : "opacity-0",
+        )}
         onClick={onClose}
       />
 
       <aside
         className={cn(
-          "absolute left-0 top-0 flex h-full w-[410px] flex-col border-r border-[#333] bg-[#151515] shadow-2xl transition-transform duration-200",
+          "absolute left-0 top-0 flex h-full w-[410px] flex-col border-r border-[var(--lc-border)] bg-[var(--lc-page)] shadow-2xl transition-transform duration-200",
           open ? "translate-x-0" : "-translate-x-full",
         )}
       >
-        <div className="flex h-14 items-center justify-between border-b border-[#2a2a2a] px-4">
+        <div className="flex h-14 items-center justify-between border-b border-[var(--lc-border)] px-4">
           <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-[#f1f1f1]">Problem List</h2>
-            <span className="rounded-full bg-[#222] px-2 py-0.5 text-xs text-[#9f9f9f]">
+            <h2 className="text-lg font-semibold text-[var(--lc-text-strong)]">Problem List</h2>
+            <span className="rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-xs text-[var(--lc-muted)]">
               {solvedCount}/{problemIndex.length} Solved
             </span>
           </div>
@@ -218,7 +239,7 @@ export function ProblemListDrawer({
           </Button>
         </div>
 
-        <div className="border-b border-[#2a2a2a] p-4">
+        <div className="border-b border-[var(--lc-border)] p-4">
           <div className="mb-3 flex items-center gap-2">
             <Button className="flex-1" variant="secondary" onClick={() => setCreatingManual(true)}>
               <Plus className="h-4 w-4" />
@@ -236,9 +257,15 @@ export function ProblemListDrawer({
             </Button>
           </div>
 
-          <BackupButtons onExport={onExportBackup} onImport={onImportBackup} onStatusChange={setImportStatus} />
+          <BackupButtons
+            onExport={onExportBackup}
+            onImport={onImportBackup}
+            onStatusChange={setImportStatus}
+          />
 
-          {importStatus ? <div className="mt-3 mb-3 text-xs text-[#8f8f8f]">{importStatus}</div> : null}
+          {importStatus ? (
+            <div className="mt-3 mb-3 text-xs text-[var(--lc-muted)]">{importStatus}</div>
+          ) : null}
 
           {creatingManual ? (
             <div className="mb-3">
@@ -255,7 +282,7 @@ export function ProblemListDrawer({
 
           <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#777]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--lc-subtle)]" />
               <Input
                 className="rounded-full pl-9"
                 placeholder="Search questions"
@@ -264,8 +291,12 @@ export function ProblemListDrawer({
               />
             </div>
 
-            <div className="flex shrink-0 items-center rounded-lg border border-[#2a2a2a] bg-[#1b1b1b] p-0.5">
-              <FilterButton active={statusFilter === "all"} title={statusFilterTitle.all} onClick={() => setStatusFilter("all")}>
+            <div className="flex shrink-0 items-center rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)] p-0.5">
+              <FilterButton
+                active={statusFilter === "all"}
+                title={statusFilterTitle.all}
+                onClick={() => setStatusFilter("all")}
+              >
                 <ListFilter className="h-4 w-4" />
               </FilterButton>
               <FilterButton
@@ -287,22 +318,46 @@ export function ProblemListDrawer({
         </div>
 
         <div className="flex-1 overflow-auto p-2">
-          <Section count={filteredIndex.leetcode.length} open={leetcodeOpen} title="LeetCode problems" onOpenChange={setLeetcodeOpen}>
+          <Section
+            count={filteredIndex.leetcode.length}
+            open={leetcodeOpen}
+            title="LeetCode problems"
+            onOpenChange={setLeetcodeOpen}
+          >
             {filteredIndex.leetcode.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-[#777]">Import neenza JSON to add LeetCode problems.</div>
+              <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">
+                Import LeetCode JSON to add problems.
+              </div>
             ) : (
               filteredIndex.leetcode.map((item) => (
-                <ProblemRow key={item.id} activeProblemId={activeProblemId} item={item} onSelect={onSelect} />
+                <ProblemRow
+                  key={item.id}
+                  activeProblemId={activeProblemId}
+                  item={item}
+                  onSelect={onSelect}
+                />
               ))
             )}
           </Section>
 
-          <Section count={filteredIndex.manual.length} open={manualOpen} title="Manual problems" onOpenChange={setManualOpen}>
+          <Section
+            count={filteredIndex.manual.length}
+            open={manualOpen}
+            title="Manual problems"
+            onOpenChange={setManualOpen}
+          >
             {filteredIndex.manual.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-[#777]">Manual problems will appear here.</div>
+              <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">
+                Manual problems will appear here.
+              </div>
             ) : (
               filteredIndex.manual.map((item) => (
-                <ProblemRow key={item.id} activeProblemId={activeProblemId} item={item} onSelect={onSelect} />
+                <ProblemRow
+                  key={item.id}
+                  activeProblemId={activeProblemId}
+                  item={item}
+                  onSelect={onSelect}
+                />
               ))
             )}
           </Section>

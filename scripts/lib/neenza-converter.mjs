@@ -15,7 +15,9 @@ function normalizeDataset(dataset) {
 }
 
 function normalizeDifficulty(value) {
-  const text = String(value ?? "Medium").trim().toLowerCase();
+  const text = String(value ?? "Medium")
+    .trim()
+    .toLowerCase();
   if (text === "easy") return "Easy";
   if (text === "hard") return "Hard";
   return "Medium";
@@ -47,18 +49,38 @@ function normalizeSlug(problem) {
 }
 
 function normalizeNumber(problem) {
-  const rawNumber = problem.frontend_id ?? problem.frontendId ?? problem.questionFrontendId ?? problem.problem_id ?? problem.id;
+  const rawNumber =
+    problem.frontend_id ??
+    problem.frontendId ??
+    problem.questionFrontendId ??
+    problem.problem_id ??
+    problem.id;
   const number = Number(rawNumber);
   return Number.isFinite(number) && number > 0 ? number : 0;
 }
 
 function normalizeTopics(problem) {
-  if (Array.isArray(problem.topics)) return problem.topics.filter((topic) => typeof topic === "string");
+  if (Array.isArray(problem.topics)) {
+    return Array.from(
+      new Set(
+        problem.topics
+          .filter((topic) => typeof topic === "string")
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+      ),
+    );
+  }
 
   if (Array.isArray(problem.topicTags)) {
-    return problem.topicTags
-      .map((topic) => (typeof topic === "string" ? topic : topic?.name))
-      .filter(Boolean);
+    return Array.from(
+      new Set(
+        problem.topicTags
+          .map((topic) => (typeof topic === "string" ? topic : topic?.name))
+          .filter(Boolean)
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+      ),
+    );
   }
 
   return [];
@@ -69,7 +91,11 @@ function getCodeSnippet(problem) {
   if (!snippets) return "";
 
   if (Array.isArray(snippets)) {
-    return snippets.find((snippet) => snippet.langSlug === "javascript")?.code ?? snippets.find((snippet) => snippet.langSlug === "typescript")?.code ?? "";
+    return (
+      snippets.find((snippet) => snippet.langSlug === "javascript")?.code ??
+      snippets.find((snippet) => snippet.langSlug === "typescript")?.code ??
+      ""
+    );
   }
 
   return snippets.javascript ?? snippets.typescript ?? "";
@@ -89,9 +115,14 @@ function extractFunctionName(code, title) {
     if (match?.[1]) return match[1];
   }
 
-  const words = String(title).replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/);
+  const words = String(title)
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/);
   const [first = "solution", ...rest] = words;
-  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join("");
+  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join(
+    "",
+  );
 }
 
 function createStarterCode(problem, title) {
@@ -113,11 +144,17 @@ function sectionBetween(text, startRe, endRe) {
 }
 
 function cleanInput(input) {
-  return input.replace(/^\s*Input\s*:?\s*/i, "").replace(/,\s*Output\s*:.*/is, "").trim();
+  return input
+    .replace(/^\s*Input\s*:?\s*/i, "")
+    .replace(/,\s*Output\s*:.*/is, "")
+    .trim();
 }
 
 function cleanExpected(expected) {
-  return expected.replace(/^\s*Output\s*:?\s*/i, "").replace(OUTPUT_END_RE, "").trim();
+  return expected
+    .replace(/^\s*Output\s*:?\s*/i, "")
+    .replace(OUTPUT_END_RE, "")
+    .trim();
 }
 
 function parseExampleText(exampleText, id) {
@@ -137,28 +174,30 @@ function normalizeExamples(problem, problemId) {
   if (!Array.isArray(problem.examples)) return [];
 
   return problem.examples
-    .map((example, index) => parseExampleText(example.example_text ?? example.text ?? "", `${problemId}-case-${index + 1}`))
+    .map((example, index) =>
+      parseExampleText(
+        example.example_text ?? example.text ?? "",
+        `${problemId}-case-${index + 1}`,
+      ),
+    )
     .filter(Boolean);
 }
 
 function buildDescriptionMarkdown(problem, title, number) {
   const parts = [`# ${number ? `${number}. ` : ""}${title}`];
-  const topics = normalizeTopics(problem);
 
   if (problem.description) parts.push(String(problem.description).trim());
   else if (problem.content) parts.push(String(problem.content).trim());
   else parts.push("Paste the problem description here.");
 
   if (Array.isArray(problem.constraints) && problem.constraints.length > 0) {
-    parts.push(`## Constraints\n\n${problem.constraints.map((constraint) => `- ${constraint}`).join("\n")}`);
+    parts.push(
+      `## Constraints\n\n${problem.constraints.map((constraint) => `- ${constraint}`).join("\n")}`,
+    );
   }
 
   if (Array.isArray(problem.hints) && problem.hints.length > 0) {
     parts.push(`## Hints\n\n${problem.hints.map((hint) => `- ${hint}`).join("\n")}`);
-  }
-
-  if (topics.length > 0) {
-    parts.push(`## Topics\n\n${topics.map((topic) => `- ${topic}`).join("\n")}`);
   }
 
   return parts.filter(Boolean).join("\n\n");
@@ -166,7 +205,9 @@ function buildDescriptionMarkdown(problem, title, number) {
 
 function judgeModeFrom(problem) {
   const haystack = `${problem.title ?? ""}\n${problem.description ?? ""}`.toLowerCase();
-  return haystack.includes("any order") || haystack.includes("in any order") ? "unordered-array" : "exact";
+  return haystack.includes("any order") || haystack.includes("in any order")
+    ? "unordered-array"
+    : "exact";
 }
 
 function problemFromNeenza(problem) {
@@ -178,6 +219,7 @@ function problemFromNeenza(problem) {
 
   const id = `lc-${number}`;
   const code = createStarterCode(problem, title);
+  const topics = normalizeTopics(problem);
 
   const testCases = normalizeExamples(problem, id);
 
@@ -188,12 +230,14 @@ function problemFromNeenza(problem) {
     title,
     slug,
     difficulty: normalizeDifficulty(problem.difficulty),
+    topics,
     descriptionMarkdown: buildDescriptionMarkdown(problem, title, number),
     notesMarkdown: "",
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,
-    testCases: testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
+    testCases:
+      testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
     submissions: [],
   };
 }

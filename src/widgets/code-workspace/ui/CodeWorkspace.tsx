@@ -1,3 +1,4 @@
+import { CheckSquare, Code2, FileText } from "lucide-react";
 import type { Problem, RunResult, TestCase } from "@/entities/problem/model/types";
 import { SolutionEditor } from "@/features/problem-editor/ui/SolutionEditor";
 import { TestcaseEditor } from "@/features/testcases/ui/TestcaseEditor";
@@ -5,6 +6,7 @@ import { TestResultPanel } from "@/widgets/test-result-panel/ui/TestResultPanel"
 import { Button } from "@/shared/ui/button";
 
 type BottomTab = "testcase" | "result";
+type AppTheme = "dark" | "light";
 
 export function CodeWorkspace({
   problem,
@@ -12,26 +14,26 @@ export function CodeWorkspace({
   bottomTab,
   activeCaseId,
   editorResetKey,
+  theme,
   onBottomTabChange,
   onActiveCaseChange,
   onProblemChange,
   onCodeChange,
   onCodeDraftChange,
-  onRunCurrent,
-  onRunAll,
+  onRun,
 }: {
   problem: Problem;
   result: RunResult | null;
   bottomTab: BottomTab;
   activeCaseId?: string;
   editorResetKey: number;
+  theme: AppTheme;
   onBottomTabChange: (tab: BottomTab) => void;
   onActiveCaseChange: (id: string) => void;
   onProblemChange: (problem: Problem) => void;
   onCodeChange: (problemId: string, code: string) => void;
   onCodeDraftChange: (problemId: string, code: string) => void;
-  onRunCurrent: () => void;
-  onRunAll: () => void;
+  onRun: () => void;
 }) {
   function updateTestCases(testCases: TestCase[]) {
     onProblemChange({ ...problem, testCases });
@@ -39,10 +41,10 @@ export function CodeWorkspace({
 
   return (
     <section className="grid h-full min-h-0 grid-rows-[minmax(0,1fr)_minmax(270px,42%)] gap-2">
-      <div className="min-h-0 overflow-hidden rounded-lg border border-[#303030] bg-[#1f1f1f]">
-        <div className="flex h-11 items-center justify-between border-b border-[#303030] bg-[#252525] px-3">
-          <div className="flex items-center gap-2 text-sm font-medium text-[#cfcfcf]">
-            <span className="text-[#2db55d]">&lt;/&gt;</span>
+      <div className="min-h-0 overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
+        <div className="flex h-11 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--lc-text)]">
+            <Code2 className="h-4 w-4 text-[var(--lc-success)]" />
             Code
           </div>
         </div>
@@ -51,21 +53,23 @@ export function CodeWorkspace({
             initialCode={problem.code}
             problemId={problem.id}
             resetKey={editorResetKey}
-            onRun={onRunCurrent}
+            theme={theme}
+            onRun={onRun}
             onDraftChange={onCodeDraftChange}
             onChange={onCodeChange}
           />
         </div>
       </div>
 
-      <div className="min-h-0 overflow-hidden rounded-lg border border-[#303030] bg-[#1f1f1f]">
-        <div className="flex h-11 items-center justify-between border-b border-[#303030] bg-[#252525] px-3">
+      <div className="min-h-0 overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
+        <div className="flex h-11 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
           <div className="flex items-center gap-2">
             <Button
               className="h-7 px-2 text-xs"
               onClick={() => onBottomTabChange("testcase")}
               variant={bottomTab === "testcase" ? "default" : "ghost"}
             >
+              <CheckSquare className="h-4 w-4" />
               Testcase
             </Button>
             <Button
@@ -73,15 +77,8 @@ export function CodeWorkspace({
               onClick={() => onBottomTabChange("result")}
               variant={bottomTab === "result" ? "default" : "ghost"}
             >
+              <FileText className="h-4 w-4" />
               Test Result
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button className="h-7 px-2 text-xs" variant="secondary" onClick={onRunCurrent}>
-              Run Case
-            </Button>
-            <Button className="h-7 px-2 text-xs" variant="secondary" onClick={onRunAll}>
-              Run All
             </Button>
           </div>
         </div>

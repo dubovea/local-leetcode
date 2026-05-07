@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Problem, ProblemsBackup, RunResult, RunStatus, Submission } from "@/entities/problem/model/types";
+import type {
+  Problem,
+  ProblemsBackup,
+  RunResult,
+  RunStatus,
+  Submission,
+} from "@/entities/problem/model/types";
 import { useProblemStore } from "@/entities/problem/model/problemStore";
 import { runInWorker } from "@/features/problem-runner/model/runInWorker";
 import { createId } from "@/shared/lib/id";
@@ -9,7 +15,15 @@ import { ProblemDescriptionPanel } from "@/widgets/problem-description/ui/Proble
 import { CodeWorkspace } from "@/widgets/code-workspace/ui/CodeWorkspace";
 
 type BottomTab = "testcase" | "result";
-type RunScope = "current" | "all";
+type AppTheme = "dark" | "light";
+
+const THEME_STORAGE_KEY = "local-leetcode:theme";
+
+function getInitialTheme(): AppTheme {
+  const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+  return storedTheme === "light" ? "light" : "dark";
+}
 
 function resultToSubmission(result: RunResult, code: string): Submission {
   const status = result.status as Exclude<RunStatus, "idle" | "running">;
@@ -51,11 +65,17 @@ export function ProblemPage() {
   const [activeCaseId, setActiveCaseId] = useState<string | undefined>();
   const [lastResult, setLastResult] = useState<RunResult | null>(null);
   const [editorResetKey, setEditorResetKey] = useState(0);
+  const [theme, setTheme] = useState<AppTheme>(getInitialTheme);
   const latestCodeRef = useRef("");
 
   useEffect(() => {
     void initialize();
   }, [initialize]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_STORAGE_KEY, theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!activeProblem) {
@@ -69,14 +89,13 @@ export function ProblemPage() {
   }, [activeProblem?.id]);
 
   const execute = useCallback(
-    async (scope: RunScope, saveSubmission: boolean) => {
+    async (saveSubmission: boolean) => {
       if (!activeProblem || running) {
         return;
       }
 
       const code = latestCodeRef.current || activeProblem.code;
-      const activeCase = activeProblem.testCases.find((testCase) => testCase.id === activeCaseId);
-      const testCases = scope === "current" && activeCase ? [activeCase] : activeProblem.testCases;
+      const testCases = activeProblem.testCases;
 
       if (testCases.length === 0) {
         return;
@@ -102,7 +121,7 @@ export function ProblemPage() {
 
       setRunning(false);
     },
-    [activeCaseId, activeProblem, addSubmission, running, saveProblemCode],
+    [activeProblem, addSubmission, running, saveProblemCode],
   );
 
   async function handleSelectProblem(problemId: string) {
@@ -144,7 +163,8 @@ export function ProblemPage() {
   }
 
   async function handleProblemChange(problem: Problem) {
-    const code = problem.id === activeProblemId ? latestCodeRef.current || problem.code : problem.code;
+    const code =
+      problem.id === activeProblemId ? latestCodeRef.current || problem.code : problem.code;
     await updateActiveProblem({ ...problem, code });
   }
 
@@ -154,11 +174,19 @@ export function ProblemPage() {
   }
 
   if (!hydrated) {
-    return <div className="flex h-screen items-center justify-center bg-[#0f0f0f] text-sm text-[#a8a8a8]">Loading local problems…</div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--lc-page)] text-sm text-[var(--lc-muted)]">
+        Loading local problems...
+      </div>
+    );
   }
 
   if (errorText) {
-    return <div className="flex h-screen items-center justify-center bg-[#0f0f0f] p-6 text-sm text-[#ff8b8b]">{errorText}</div>;
+    return (
+      <div className="flex h-screen items-center justify-center bg-[var(--lc-page)] p-6 text-sm text-[var(--lc-danger-text)]">
+        {errorText}
+      </div>
+    );
   }
 
   if (!activeProblem || !activeProblemId) {
@@ -166,12 +194,14 @@ export function ProblemPage() {
   }
 
   return (
-    <div className="flex h-screen min-h-0 flex-col bg-[#0f0f0f] text-[#d4d4d4]">
+    <div className="flex h-screen min-h-0 flex-col bg-[var(--lc-page)] text-[var(--lc-text)]">
       <TopBar
+        theme={theme}
         running={running}
         onOpenProblemList={() => setDrawerOpen(true)}
-        onRun={() => void execute("current", false)}
-        onSubmit={() => void execute("all", true)}
+        onPlay={() => void execute(false)}
+        onSubmit={() => void execute(true)}
+        onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
       />
 
       <ProblemListDrawer
@@ -203,13 +233,13 @@ export function ProblemPage() {
           editorResetKey={editorResetKey}
           problem={activeProblem}
           result={lastResult}
+          theme={theme}
           onActiveCaseChange={setActiveCaseId}
           onBottomTabChange={setBottomTab}
           onProblemChange={(problem) => void handleProblemChange(problem)}
           onCodeDraftChange={handleCodeDraftChange}
           onCodeChange={(problemId, code) => void handleCodeChange(problemId, code)}
-          onRunCurrent={() => void execute("current", false)}
-          onRunAll={() => void execute("all", false)}
+          onRun={() => void execute(false)}
         />
       </main>
     </div>

@@ -5,18 +5,26 @@ import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
 
 function toSlug(title: string) {
-  return title
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "") || "manual-problem";
+  return (
+    title
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "manual-problem"
+  );
 }
 
 function toFunctionName(title: string) {
-  const words = title.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/).filter(Boolean);
+  const words = title
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   const [first = "solution", ...rest] = words;
 
-  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join("");
+  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join(
+    "",
+  );
 }
 
 export function CreateManualProblemForm({
@@ -36,7 +44,8 @@ export function CreateManualProblemForm({
   function createProblem() {
     const cleanTitle = title.trim() || "Custom Problem";
     const cleanNumber = Number(number);
-    const problemNumber = Number.isFinite(cleanNumber) && cleanNumber > 0 ? cleanNumber : nextNumber;
+    const problemNumber =
+      Number.isFinite(cleanNumber) && cleanNumber > 0 ? cleanNumber : nextNumber;
     const cleanFunctionName = functionName.trim() || toFunctionName(cleanTitle);
     const slug = toSlug(cleanTitle);
 
@@ -47,6 +56,7 @@ export function CreateManualProblemForm({
       title: cleanTitle,
       slug: `manual-${slug}`,
       difficulty,
+      topics: [],
       functionName: cleanFunctionName,
       judgeMode: "exact",
       descriptionMarkdown: `# ${problemNumber}. ${cleanTitle}\n\nWrite the problem description in Markdown.`,
@@ -58,10 +68,12 @@ export function CreateManualProblemForm({
   }
 
   return (
-    <div className="rounded-lg border border-[#333] bg-[#202020] p-3">
-      <div className="mb-3 text-sm font-semibold text-[#f0f0f0]">New manual problem</div>
+    <div className="rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-3">
+      <div className="mb-3 text-sm font-semibold text-[var(--lc-text-strong)]">
+        New manual problem
+      </div>
 
-      <label className="mb-1 block text-xs font-medium text-[#9f9f9f]">Title</label>
+      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Title</label>
       <Input
         className="mb-3"
         value={title}
@@ -76,7 +88,7 @@ export function CreateManualProblemForm({
 
       <div className="mb-3 grid grid-cols-2 gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[#9f9f9f]">Number</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Number</label>
           <Input
             inputMode="numeric"
             value={number}
@@ -84,9 +96,11 @@ export function CreateManualProblemForm({
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-[#9f9f9f]">Difficulty</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">
+            Difficulty
+          </label>
           <select
-            className="h-9 w-full rounded-md border border-[#333] bg-[#2b2b2b] px-3 text-sm text-[#f1f1f1] outline-none focus:border-[#555]"
+            className="h-9 w-full rounded-md border border-[var(--lc-border)] bg-[var(--lc-input-strong)] px-3 text-sm text-[var(--lc-text-strong)] outline-none focus:border-[var(--lc-border-strong)]"
             value={difficulty}
             onChange={(event) => setDifficulty(event.target.value as Difficulty)}
           >
@@ -97,7 +111,7 @@ export function CreateManualProblemForm({
         </div>
       </div>
 
-      <label className="mb-1 block text-xs font-medium text-[#9f9f9f]">Function name</label>
+      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Function name</label>
       <Input
         className="mb-3 font-mono"
         value={functionName}

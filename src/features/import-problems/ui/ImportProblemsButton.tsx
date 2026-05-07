@@ -61,15 +61,17 @@ export function ImportProblemsButton({
         }}
       />
       <Button
-        aria-label="Import neenza JSON"
+        aria-label="Import LeetCode JSON"
         size="icon"
-        title="Import neenza JSON"
+        title="Import LeetCode JSON"
         variant="secondary"
         onClick={() => inputRef.current?.click()}
       >
         <Upload className="h-4 w-4" />
       </Button>
-      {!onStatusChange && statusText ? <div className="mt-2 text-xs text-[#8f8f8f]">{statusText}</div> : null}
+      {!onStatusChange && statusText ? (
+        <div className="mt-2 text-xs text-[var(--lc-muted)]">{statusText}</div>
+      ) : null}
     </div>
   );
 }

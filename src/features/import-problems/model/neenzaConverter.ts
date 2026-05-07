@@ -67,7 +67,9 @@ function normalizeDataset(dataset: unknown): NeenzaProblem[] {
 }
 
 function normalizeDifficulty(value: unknown): Difficulty {
-  const text = String(value ?? "Medium").trim().toLowerCase();
+  const text = String(value ?? "Medium")
+    .trim()
+    .toLowerCase();
 
   if (text === "easy") {
     return "Easy";
@@ -108,7 +110,12 @@ function normalizeSlug(problem: NeenzaProblem) {
 }
 
 function normalizeNumber(problem: NeenzaProblem) {
-  const rawNumber = problem.frontend_id ?? problem.frontendId ?? problem.questionFrontendId ?? problem.problem_id ?? problem.id;
+  const rawNumber =
+    problem.frontend_id ??
+    problem.frontendId ??
+    problem.questionFrontendId ??
+    problem.problem_id ??
+    problem.id;
   const number = Number(rawNumber);
 
   return Number.isFinite(number) && number > 0 ? number : 0;
@@ -116,13 +123,26 @@ function normalizeNumber(problem: NeenzaProblem) {
 
 function normalizeTopics(problem: NeenzaProblem) {
   if (Array.isArray(problem.topics)) {
-    return problem.topics.filter((topic): topic is string => typeof topic === "string");
+    return Array.from(
+      new Set(
+        problem.topics
+          .filter((topic): topic is string => typeof topic === "string")
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+      ),
+    );
   }
 
   if (Array.isArray(problem.topicTags)) {
-    return problem.topicTags
-      .map((topic) => (typeof topic === "string" ? topic : topic.name))
-      .filter((topic): topic is string => Boolean(topic));
+    return Array.from(
+      new Set(
+        problem.topicTags
+          .map((topic) => (typeof topic === "string" ? topic : topic.name))
+          .filter((topic): topic is string => Boolean(topic))
+          .map((topic) => topic.trim())
+          .filter(Boolean),
+      ),
+    );
   }
 
   return [];
@@ -136,7 +156,11 @@ function getCodeSnippet(problem: NeenzaProblem) {
   }
 
   if (Array.isArray(snippets)) {
-    return snippets.find((snippet) => snippet.langSlug === "javascript")?.code ?? snippets.find((snippet) => snippet.langSlug === "typescript")?.code ?? "";
+    return (
+      snippets.find((snippet) => snippet.langSlug === "javascript")?.code ??
+      snippets.find((snippet) => snippet.langSlug === "typescript")?.code ??
+      ""
+    );
   }
 
   return snippets.javascript ?? snippets.typescript ?? "";
@@ -159,9 +183,14 @@ function extractFunctionName(code: string, title: string) {
     }
   }
 
-  const words = title.replace(/[^a-zA-Z0-9]+/g, " ").trim().split(/\s+/);
+  const words = title
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/);
   const [first = "solution", ...rest] = words;
-  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join("");
+  return [first.toLowerCase(), ...rest.map((word) => word[0].toUpperCase() + word.slice(1))].join(
+    "",
+  );
 }
 
 function createStarterCode(problem: NeenzaProblem, title: string) {
@@ -230,13 +259,17 @@ function normalizeExamples(problem: NeenzaProblem, problemId: string) {
   }
 
   return problem.examples
-    .map((example, index) => parseExampleText(example.example_text ?? example.text ?? "", `${problemId}-case-${index + 1}`))
+    .map((example, index) =>
+      parseExampleText(
+        example.example_text ?? example.text ?? "",
+        `${problemId}-case-${index + 1}`,
+      ),
+    )
     .filter((testCase): testCase is TestCase => Boolean(testCase));
 }
 
 function buildDescriptionMarkdown(problem: NeenzaProblem, title: string, number: number) {
   const parts = [`# ${number ? `${number}. ` : ""}${title}`];
-  const topics = normalizeTopics(problem);
 
   if (problem.description) {
     parts.push(problem.description.trim());
@@ -247,15 +280,13 @@ function buildDescriptionMarkdown(problem: NeenzaProblem, title: string, number:
   }
 
   if (Array.isArray(problem.constraints) && problem.constraints.length > 0) {
-    parts.push(`## Constraints\n\n${problem.constraints.map((constraint) => `- ${constraint}`).join("\n")}`);
+    parts.push(
+      `## Constraints\n\n${problem.constraints.map((constraint) => `- ${constraint}`).join("\n")}`,
+    );
   }
 
   if (Array.isArray(problem.hints) && problem.hints.length > 0) {
     parts.push(`## Hints\n\n${problem.hints.map((hint) => `- ${hint}`).join("\n")}`);
-  }
-
-  if (topics.length > 0) {
-    parts.push(`## Topics\n\n${topics.map((topic) => `- ${topic}`).join("\n")}`);
   }
 
   return parts.filter(Boolean).join("\n\n");
@@ -282,6 +313,7 @@ function problemFromNeenza(problem: NeenzaProblem): Problem | null {
 
   const id = `lc-${number}`;
   const code = createStarterCode(problem, title);
+  const topics = normalizeTopics(problem);
 
   const testCases = normalizeExamples(problem, id);
 
@@ -291,13 +323,17 @@ function problemFromNeenza(problem: NeenzaProblem): Problem | null {
     number,
     title,
     slug,
-    difficulty: DIFFICULTIES.includes(problem.difficulty as Difficulty) ? (problem.difficulty as Difficulty) : normalizeDifficulty(problem.difficulty),
+    difficulty: DIFFICULTIES.includes(problem.difficulty as Difficulty)
+      ? (problem.difficulty as Difficulty)
+      : normalizeDifficulty(problem.difficulty),
+    topics,
     descriptionMarkdown: buildDescriptionMarkdown(problem, title, number),
     notesMarkdown: "",
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,
-    testCases: testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
+    testCases:
+      testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
     submissions: [],
   };
 }

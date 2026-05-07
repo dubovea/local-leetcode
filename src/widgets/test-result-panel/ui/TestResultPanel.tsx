@@ -1,4 +1,11 @@
-import type { CaseRunResult, ConsoleLog, RunResult, RunStatus, TestCase } from "@/entities/problem/model/types";
+import { CheckCircle2, CheckSquare, Circle, XCircle } from "lucide-react";
+import type {
+  CaseRunResult,
+  ConsoleLog,
+  RunResult,
+  RunStatus,
+  TestCase,
+} from "@/entities/problem/model/types";
 import { formatRuntime } from "@/shared/lib/date";
 import { StatusText } from "@/shared/ui/StatusText";
 import { cn } from "@/shared/lib/cn";
@@ -14,10 +21,16 @@ function Logs({ logs }: { logs: ConsoleLog[] }) {
 
   return (
     <div className="mt-4">
-      <div className="mb-2 text-xs font-semibold text-[#a8a8a8]">Console</div>
-      <div className="max-h-40 overflow-auto rounded-lg bg-[#171717] p-3 font-mono text-xs">
+      <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">Console</div>
+      <div className="max-h-40 overflow-auto rounded-lg bg-[var(--lc-code)] p-3 font-mono text-xs">
         {logs.map((log, index) => (
-          <div key={index} className={cn("whitespace-pre-wrap leading-5", log.type === "error" ? "text-[#ff8b8b]" : "text-[#d7d7d7]")}> 
+          <div
+            key={index}
+            className={cn(
+              "whitespace-pre-wrap leading-5",
+              log.type === "error" ? "text-[var(--lc-danger-text)]" : "text-[var(--lc-text)]",
+            )}
+          >
             {log.text}
           </div>
         ))}
@@ -29,8 +42,10 @@ function Logs({ logs }: { logs: ConsoleLog[] }) {
 function ValueBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="mt-4">
-      <div className="mb-2 text-xs font-semibold text-[#a8a8a8]">{label}</div>
-      <pre className="overflow-auto rounded-lg bg-[#2b2b2b] p-3 font-mono text-sm leading-6 text-[#f1f1f1]">{value || " "}</pre>
+      <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">{label}</div>
+      <pre className="overflow-auto rounded-lg bg-[var(--lc-code-strong)] p-3 font-mono text-sm leading-6 text-[var(--lc-text-strong)]">
+        {value || " "}
+      </pre>
     </div>
   );
 }
@@ -45,23 +60,39 @@ function CaseTabs({
   onActiveCaseChange: (id: string) => void;
 }) {
   return (
-    <div className="flex gap-2 overflow-x-auto border-b border-[#303030] px-3 py-2">
-      {cases.map((testCase, index) => (
-        <button
-          key={testCase.id}
-          className={cn(
-            "rounded-md px-3 py-1 text-sm font-medium transition-colors",
-            testCase.id === visibleCaseId ? "bg-[#363636] text-[#f0f0f0]" : "text-[#a8a8a8] hover:bg-[#2a2a2a]",
-          )}
-          type="button"
-          onClick={() => onActiveCaseChange(testCase.id)}
-        >
-          {typeof testCase.passed === "boolean" ? (
-            <span className={testCase.passed ? "text-[#2db55d]" : "text-[#ff5555]"}>■ </span>
-          ) : null}
-          Case {index + 1}
-        </button>
-      ))}
+    <div className="flex gap-2 overflow-x-auto border-b border-[var(--lc-border)] px-3 py-2">
+      {cases.map((testCase, index) => {
+        const ResultIcon =
+          typeof testCase.passed === "boolean"
+            ? testCase.passed
+              ? CheckCircle2
+              : XCircle
+            : Circle;
+
+        return (
+          <button
+            key={testCase.id}
+            className={cn(
+              "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors",
+              testCase.id === visibleCaseId
+                ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
+                : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
+            )}
+            type="button"
+            onClick={() => onActiveCaseChange(testCase.id)}
+          >
+            {typeof testCase.passed === "boolean" ? (
+              <ResultIcon
+                className={cn(
+                  "h-3.5 w-3.5",
+                  testCase.passed ? "text-[var(--lc-success)]" : "text-[var(--lc-danger-strong)]",
+                )}
+              />
+            ) : null}
+            Case {index + 1}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -81,12 +112,16 @@ export function TestResultPanel({
     const activeCase = testCases.find((testCase) => testCase.id === activeCaseId) ?? testCases[0];
 
     return (
-      <div className="flex h-full min-h-0 flex-col bg-[#1f1f1f]">
-        <div className="flex h-11 shrink-0 items-center border-b border-[#303030] px-3 text-sm font-medium text-[#cfcfcf]">
-          <span className="mr-2 text-[#2db55d]">☑</span>
+      <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
+        <div className="flex h-11 shrink-0 items-center border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
+          <CheckSquare className="mr-2 h-4 w-4 text-[var(--lc-success)]" />
           Testcase
         </div>
-        <CaseTabs cases={testCases} visibleCaseId={activeCase.id} onActiveCaseChange={onActiveCaseChange} />
+        <CaseTabs
+          cases={testCases}
+          visibleCaseId={activeCase.id}
+          onActiveCaseChange={onActiveCaseChange}
+        />
         <div className="overflow-auto p-4">
           <ValueBlock label="Input" value={activeCase.input} />
           <ValueBlock label="Expected" value={activeCase.expected} />
@@ -100,9 +135,9 @@ export function TestResultPanel({
   const status: RunStatus = result.status;
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[#1f1f1f]">
-      <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[#303030] px-3 text-sm font-medium text-[#cfcfcf]">
-        <span className="text-[#2db55d]">☑</span>
+    <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
+      <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
+        <CheckSquare className="h-4 w-4 text-[var(--lc-success)]" />
         <span>Test Result</span>
       </div>
 
@@ -110,20 +145,26 @@ export function TestResultPanel({
         <div className="p-4 pb-2">
           <div className="mb-4 flex flex-wrap items-center gap-4">
             <StatusText className="text-xl" status={status} />
-            <span className="text-sm text-[#a8a8a8]">Runtime: {formatRuntime(result.durationMs)}</span>
-            <span className="text-sm text-[#a8a8a8]">
+            <span className="text-sm text-[var(--lc-muted)]">
+              Runtime: {formatRuntime(result.durationMs)}
+            </span>
+            <span className="text-sm text-[var(--lc-muted)]">
               {result.passedCount}/{result.totalCount} cases passed
             </span>
           </div>
 
           {result.status === "runtime-error" || result.status === "timeout" ? (
-            <pre className="mb-4 max-h-48 overflow-auto rounded-lg bg-[#3a2222] p-4 font-mono text-xs leading-5 text-[#ffb4b4]">
+            <pre className="mb-4 max-h-48 overflow-auto rounded-lg bg-[var(--lc-danger-soft)] p-4 font-mono text-xs leading-5 text-[var(--lc-danger-text)]">
               {result.errorText ?? visibleCase?.errorText}
             </pre>
           ) : null}
         </div>
 
-        <CaseTabs cases={result.cases} visibleCaseId={visibleCase?.id} onActiveCaseChange={onActiveCaseChange} />
+        <CaseTabs
+          cases={result.cases}
+          visibleCaseId={visibleCase?.id}
+          onActiveCaseChange={onActiveCaseChange}
+        />
 
         <div className="p-4 pt-0">
           {visibleCase ? (
@@ -131,7 +172,9 @@ export function TestResultPanel({
               <ValueBlock label="Input" value={visibleCase.inputText} />
               <ValueBlock label="Output" value={visibleCase.outputText} />
               <ValueBlock label="Expected" value={visibleCase.expectedText} />
-              {visibleCase.errorText ? <ValueBlock label="Error" value={visibleCase.errorText} /> : null}
+              {visibleCase.errorText ? (
+                <ValueBlock label="Error" value={visibleCase.errorText} />
+              ) : null}
             </>
           ) : null}
 

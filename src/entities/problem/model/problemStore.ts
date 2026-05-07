@@ -34,6 +34,7 @@ function normalizeProblem(problem: Problem): Problem {
     notesMarkdown: problem.notesMarkdown ?? "",
     submissions: problem.submissions ?? [],
     testCases: problem.testCases ?? [],
+    topics: problem.topics ?? [],
   };
 }
 
@@ -47,6 +48,8 @@ function mergeProblem(existing: Problem | undefined, incoming: Problem): Problem
     source: existing.source ?? incoming.source,
     code: existing.code || incoming.code,
     notesMarkdown: existing.notesMarkdown ?? incoming.notesMarkdown ?? "",
+    topics:
+      existing.topics && existing.topics.length > 0 ? existing.topics : (incoming.topics ?? []),
     testCases: existing.testCases.length > 0 ? existing.testCases : incoming.testCases,
     submissions: existing.submissions.length > 0 ? existing.submissions : incoming.submissions,
   });
@@ -100,7 +103,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       const selectedProblemId = readSelectedProblemId();
       const activeProblemId = index.some((item) => item.id === selectedProblemId)
         ? selectedProblemId
-        : index[0]?.id ?? null;
+        : (index[0]?.id ?? null);
       const activeProblem = activeProblemId ? await getProblemFromDb(activeProblemId) : null;
 
       if (activeProblemId) {
@@ -190,7 +193,9 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
     const nextProblem = normalizeProblem({
       ...problem,
-      submissions: (problem.submissions ?? []).filter((submission) => submission.id !== submissionId),
+      submissions: (problem.submissions ?? []).filter(
+        (submission) => submission.id !== submissionId,
+      ),
     });
 
     await putProblemToDb(nextProblem);
@@ -206,7 +211,9 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
   async restoreSubmissionCode(problemId, submissionId) {
     const problem = await getProblemFromDb(problemId);
-    const submission = problem ? (problem.submissions ?? []).find((item) => item.id === submissionId) : undefined;
+    const submission = problem
+      ? (problem.submissions ?? []).find((item) => item.id === submissionId)
+      : undefined;
 
     if (!problem || !submission) {
       return null;
@@ -245,8 +252,12 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
   async importProblems(problems) {
     const existingProblems = await getAllProblemsFromDb();
-    const existingById = new Map(existingProblems.map((problem) => [problem.id, normalizeProblem(problem)]));
-    const mergedProblems = problems.map((problem) => mergeProblem(existingById.get(problem.id), problem));
+    const existingById = new Map(
+      existingProblems.map((problem) => [problem.id, normalizeProblem(problem)]),
+    );
+    const mergedProblems = problems.map((problem) =>
+      mergeProblem(existingById.get(problem.id), problem),
+    );
 
     await putProblemsToDb(mergedProblems);
 

@@ -4,6 +4,7 @@ import type * as Monaco from "monaco-editor";
 import { formatJavaScript } from "@/shared/lib/formatJavaScript";
 
 const CODE_SAVE_DELAY_MS = 700;
+type AppTheme = "dark" | "light";
 
 export function SolutionEditor({
   problemId,
@@ -12,15 +13,18 @@ export function SolutionEditor({
   onDraftChange,
   onRun,
   resetKey,
+  theme,
 }: {
   problemId: string;
   initialCode: string;
   resetKey: number;
+  theme: AppTheme;
   onChange: (problemId: string, code: string) => void;
   onDraftChange: (problemId: string, code: string) => void;
   onRun: () => void;
 }) {
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof Monaco | null>(null);
   const runRef = useRef(onRun);
   const changeRef = useRef(onChange);
   const draftChangeRef = useRef(onDraftChange);
@@ -33,6 +37,10 @@ export function SolutionEditor({
   useEffect(() => {
     runRef.current = onRun;
   }, [onRun]);
+
+  useEffect(() => {
+    monacoRef.current?.editor.setTheme(theme === "dark" ? "leetcode-dark" : "leetcode-light");
+  }, [theme]);
 
   useEffect(() => {
     changeRef.current = onChange;
@@ -131,6 +139,7 @@ export function SolutionEditor({
 
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     monaco.editor.defineTheme("leetcode-dark", {
       base: "vs-dark",
       inherit: true,
@@ -142,10 +151,21 @@ export function SolutionEditor({
         "editor.selectionBackground": "#3a3d41",
       },
     });
-    monaco.editor.setTheme("leetcode-dark");
+    monaco.editor.defineTheme("leetcode-light", {
+      base: "vs",
+      inherit: true,
+      rules: [],
+      colors: {
+        "editor.background": "#ffffff",
+        "editorLineNumber.foreground": "#8a8a8a",
+        "editorCursor.foreground": "#111827",
+        "editor.selectionBackground": "#dbeafe",
+      },
+    });
+    monaco.editor.setTheme(theme === "dark" ? "leetcode-dark" : "leetcode-light");
 
     monaco.languages.registerDocumentFormattingEditProvider("javascript", {
-      async provideDocumentFormattingEdits(model) {
+      async provideDocumentFormattingEdits(model: Monaco.editor.ITextModel) {
         const formatted = await formatJavaScript(model.getValue());
 
         return [

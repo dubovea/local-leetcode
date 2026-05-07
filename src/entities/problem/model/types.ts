@@ -10,7 +10,13 @@ export type TestCase = {
   expected: string;
 };
 
-export type RunStatus = "idle" | "running" | "accepted" | "wrong-answer" | "runtime-error" | "timeout";
+export type RunStatus =
+  | "idle"
+  | "running"
+  | "accepted"
+  | "wrong-answer"
+  | "runtime-error"
+  | "timeout";
 
 export type ConsoleLog = {
   type: "log" | "warn" | "error" | "table";
@@ -57,6 +63,7 @@ export type Problem = {
   title: string;
   slug: string;
   difficulty: Difficulty;
+  topics?: string[];
   descriptionMarkdown: string;
   notesMarkdown?: string;
   functionName: string;
@@ -83,6 +90,7 @@ export type ProblemCatalogItem = {
   title: string;
   slug: string;
   difficulty: Difficulty;
+  topics?: string[];
   paidOnly?: boolean;
   url: string;
 };

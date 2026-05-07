@@ -11,12 +11,12 @@ const labels: Record<RunStatus, string> = {
 };
 
 const classes: Record<RunStatus, string> = {
-  idle: "text-[#a8a8a8]",
-  running: "text-[#ffc01e]",
-  accepted: "text-[#2db55d]",
-  "wrong-answer": "text-[#ff5555]",
-  "runtime-error": "text-[#ff5555]",
-  timeout: "text-[#ff5555]",
+  idle: "text-[var(--lc-muted)]",
+  running: "text-[var(--lc-warning)]",
+  accepted: "text-[var(--lc-success)]",
+  "wrong-answer": "text-[var(--lc-danger-strong)]",
+  "runtime-error": "text-[var(--lc-danger-strong)]",
+  timeout: "text-[var(--lc-danger-strong)]",
 };
 
 export function StatusText({ status, className }: { status: RunStatus; className?: string }) {

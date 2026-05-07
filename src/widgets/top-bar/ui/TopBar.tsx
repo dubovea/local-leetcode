@@ -1,45 +1,64 @@
+import { ChevronDown, List, Moon, Play, Send, Sun } from "lucide-react";
 import { Button } from "@/shared/ui/button";
+
+type AppTheme = "dark" | "light";
 
 export function TopBar({
   onOpenProblemList,
-  onRun,
+  onPlay,
   onSubmit,
+  onThemeToggle,
   running,
+  theme,
 }: {
   onOpenProblemList: () => void;
-  onRun: () => void;
+  onPlay: () => void;
   onSubmit: () => void;
+  onThemeToggle: () => void;
   running: boolean;
+  theme: AppTheme;
 }) {
+  const ThemeIcon = theme === "dark" ? Sun : Moon;
+  const themeTitle = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-[#242424] bg-[#0f0f0f] px-4">
-      <div className="flex items-center gap-3">
-        <div className="flex h-6 w-6 items-center justify-center rounded bg-[#f5b935] text-sm font-black text-black">
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-topbar)] px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[#f5b935] text-sm font-black text-black">
           L
         </div>
         <button
-          className="flex items-center gap-2 rounded px-2 py-1 text-[15px] font-semibold text-[#f1f1f1] hover:bg-[#242424]"
+          className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[15px] font-semibold text-[var(--lc-text-strong)] transition-colors hover:bg-[var(--lc-hover)]"
           type="button"
           onClick={onOpenProblemList}
         >
-          Problem List
-          <span className="text-[#9a9a9a]">›</span>
+          <List className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
+          <span className="truncate">Problem List</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
         </button>
       </div>
 
       <div className="flex items-center gap-2">
-        <Button className="min-w-24" disabled={running} onClick={onRun}>
-          ▶ Run Case
+        <Button className="min-w-24" disabled={running} onClick={onPlay}>
+          <Play className="h-4 w-4" />
+          Play
         </Button>
         <Button className="min-w-24" disabled={running} onClick={onSubmit} variant="success">
-          Submit All
+          <Send className="h-4 w-4" />
+          Submit
         </Button>
       </div>
 
-      <div className="flex items-center gap-3 text-sm text-[#8f8f8f]">
-        <span>⌘</span>
-        <span>⚙</span>
-        <span className="rounded bg-[#2b2415] px-3 py-1 text-[#f0b43a]">Premium</span>
+      <div className="flex justify-end">
+        <Button
+          aria-label={themeTitle}
+          size="icon"
+          title={themeTitle}
+          variant="ghost"
+          onClick={onThemeToggle}
+        >
+          <ThemeIcon className="h-4 w-4" />
+        </Button>
       </div>
     </header>
   );
