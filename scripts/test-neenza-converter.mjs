@@ -15,12 +15,16 @@ const sample = [
     problem_slug: "group-anagrams",
     topics: ["Array", "Hash Table", "String", "Sorting"],
     description:
-      "Given an array of strings strs, group the anagrams together. You can return the answer in any order.",
+      "Given an array of strings strs, group the anagrams together. You can return the answer in any order.\nExample 1:\nExample 2:\nConstraints:",
     examples: [
       {
         example_num: 1,
         example_text:
           'Input: strs = ["eat","tea","tan","ate","nat","bat"]\nOutput: [["bat"],["nat","tan"],["ate","eat","tea"]]\nExplanation: grouped anagrams',
+      },
+      {
+        example_num: 2,
+        example_text: 'Input: strs = [""]\nOutput: [[""]]',
       },
     ],
     constraints: ["1 <= strs.length <= 10^4"],
@@ -52,6 +56,22 @@ assert(
 assert(
   problem.testCases[0].expected === '[["bat"],["nat","tan"],["ate","eat","tea"]]',
   "expected output should be parsed from example",
+);
+assert(
+  problem.descriptionMarkdown.includes("## Example 1:"),
+  "description should include the first imported example",
+);
+assert(
+  problem.descriptionMarkdown.includes("Explanation: grouped anagrams"),
+  "description should preserve example explanations",
+);
+assert(
+  problem.descriptionMarkdown.includes("## Example 2:"),
+  "description should include all imported examples",
+);
+assert(
+  !problem.descriptionMarkdown.includes("Example 1:\nExample 2:"),
+  "description should remove empty example placeholders",
 );
 assert(
   problem.judgeMode === "unordered-array",

@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
 :root {
   font-family:
     Inter,
@@ -14,6 +41,7 @@
 :root,
 :root[data-theme="dark"] {
   color-scheme: dark;
+  --radius: 0.5rem;
   --lc-page: #0f0f0f;
   --lc-topbar: #0f0f0f;
   --lc-panel: #1f1f1f;
@@ -53,10 +81,29 @@
   --lc-hard: #ff375f;
   --lc-topic-bg: #2b2b2b;
   --lc-topic-text: #d7d7d7;
+  --background: var(--lc-page);
+  --foreground: var(--lc-text-strong);
+  --card: var(--lc-panel);
+  --card-foreground: var(--lc-text-strong);
+  --popover: var(--lc-panel-raised);
+  --popover-foreground: var(--lc-text-strong);
+  --primary: var(--lc-button-bg);
+  --primary-foreground: var(--lc-text-strong);
+  --secondary: var(--lc-secondary-bg);
+  --secondary-foreground: var(--lc-text-strong);
+  --muted: var(--lc-hover);
+  --muted-foreground: var(--lc-muted);
+  --accent: var(--lc-active);
+  --accent-foreground: var(--lc-text-strong);
+  --destructive: var(--lc-danger-text);
+  --border: var(--lc-border);
+  --input: var(--lc-input);
+  --ring: var(--lc-border-strong);
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
+  --radius: 0.5rem;
   --lc-page: #f4f4f5;
   --lc-topbar: #ffffff;
   --lc-panel: #ffffff;
@@ -96,6 +143,24 @@
   --lc-hard: #e11d48;
   --lc-topic-bg: #f0f0f1;
   --lc-topic-text: #4b5563;
+  --background: var(--lc-page);
+  --foreground: var(--lc-text-strong);
+  --card: var(--lc-panel);
+  --card-foreground: var(--lc-text-strong);
+  --popover: var(--lc-panel-raised);
+  --popover-foreground: var(--lc-text-strong);
+  --primary: var(--lc-button-bg);
+  --primary-foreground: var(--lc-text-strong);
+  --secondary: var(--lc-secondary-bg);
+  --secondary-foreground: var(--lc-text-strong);
+  --muted: var(--lc-hover);
+  --muted-foreground: var(--lc-muted);
+  --accent: var(--lc-active);
+  --accent-foreground: var(--lc-text-strong);
+  --destructive: var(--lc-danger-text);
+  --border: var(--lc-border);
+  --input: var(--lc-input);
+  --ring: var(--lc-border-strong);
 }
 
 * {

@@ -1,5 +1,6 @@
 import { CheckSquare, Plus, X } from "lucide-react";
 import type { TestCase } from "@/entities/problem/model/types";
+import { Button } from "@/shared/ui/button";
 import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/shared/lib/cn";
 import { createId } from "@/shared/lib/id";
@@ -61,14 +62,10 @@ export function TestcaseEditor({
   if (!activeCase) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center bg-[var(--lc-panel)] text-sm text-[var(--lc-muted)]">
-        <button
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-[var(--lc-border)] bg-[var(--lc-button-bg)] px-3 font-medium text-[var(--lc-text-strong)] transition-colors hover:bg-[var(--lc-button-hover)]"
-          type="button"
-          onClick={addCase}
-        >
+        <Button onClick={addCase} variant="secondary">
           <Plus className="h-4 w-4" />
           Add Case
-        </button>
+        </Button>
       </div>
     );
   }
@@ -87,7 +84,7 @@ export function TestcaseEditor({
           <div
             key={testCase.id}
             className={cn(
-              "group/case flex h-8 shrink-0 items-center gap-1 rounded-md px-3 text-sm font-medium transition-colors",
+              "group/case flex h-8 shrink-0 items-center gap-1 rounded-md px-3 text-xs font-medium transition-colors",
               testCase.id === activeCase.id
                 ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
                 : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
@@ -116,21 +113,22 @@ export function TestcaseEditor({
             ) : null}
           </div>
         ))}
-        <button
+        <Button
           aria-label="Add case"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--lc-muted)] transition-colors hover:bg-[var(--lc-hover)] hover:text-[var(--lc-text-strong)]"
+          className="shrink-0 text-[var(--lc-muted)] hover:text-[var(--lc-text-strong)]"
+          size="icon"
           title="Duplicate selected case"
-          type="button"
+          variant="ghost"
           onClick={addCase}
         >
           <Plus className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-4">
         <label className="mb-2 block text-xs font-semibold text-[var(--lc-muted)]">Input</label>
         <Textarea
-          className="mb-4 min-h-24 resize-y font-mono"
+          className="mb-4 min-h-24 resize-y font-mono text-xs leading-5"
           value={activeCase.input}
           onChange={(event) => updateActiveCase({ input: event.target.value })}
           spellCheck={false}
@@ -138,7 +136,7 @@ export function TestcaseEditor({
 
         <label className="mb-2 block text-xs font-semibold text-[var(--lc-muted)]">Expected</label>
         <Textarea
-          className="min-h-20 resize-y font-mono"
+          className="min-h-20 resize-y font-mono text-xs leading-5"
           value={activeCase.expected}
           onChange={(event) => updateActiveCase({ expected: event.target.value })}
           spellCheck={false}

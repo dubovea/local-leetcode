@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BookOpen, CheckCircle2, Eye, FileText, Pencil, ScrollText } from "lucide-react";
 import type { Problem, ProblemListItem } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
 import { MarkdownView } from "@/shared/ui/MarkdownView";
 import { Button } from "@/shared/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Textarea } from "@/shared/ui/textarea";
-import { cn } from "@/shared/lib/cn";
 import { SolutionsHistory } from "@/features/solutions-history/ui/SolutionsHistory";
 import { PatternGuide } from "@/features/pattern-guide/ui/PatternGuide";
 
@@ -55,6 +55,12 @@ export function ProblemDescriptionPanel({
 }) {
   const [tab, setTab] = useState<Tab>("description");
   const [editingMarkdown, setEditingMarkdown] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollPositionsRef = useRef<Record<Tab, number>>({
+    description: 0,
+    solutions: 0,
+    patterns: 0,
+  });
   const topics = normalizeTopics(problem.topics);
   const visibleTopics =
     topics.length > 0 ? topics : topicsFromMarkdown(problem.descriptionMarkdown);
@@ -66,53 +72,60 @@ export function ProblemDescriptionPanel({
   const solved = problem.submissions.some((submission) => submission.status === "accepted");
   const EditIcon = editingMarkdown ? Eye : Pencil;
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        scrollRef.current.scrollTop = scrollPositionsRef.current[tab] ?? 0;
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [tab]);
+
+  function rememberScroll(currentTab: Tab) {
+    if (scrollRef.current) {
+      scrollPositionsRef.current[currentTab] = scrollRef.current.scrollTop;
+    }
+  }
+
+  function changeTab(nextTab: string) {
+    rememberScroll(tab);
+    setTab(nextTab as Tab);
+  }
+
   function openLinkedProblem(problemId: string) {
-    setTab("description");
+    changeTab("description");
     onSelectProblem(problemId);
   }
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
-      <div className="flex h-11 shrink-0 items-center gap-1 border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
-        <button
-          className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-            tab === "description"
-              ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
-              : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
-          )}
-          type="button"
-          onClick={() => setTab("description")}
-        >
-          <FileText className="h-4 w-4" />
-          Описание
-        </button>
-        <button
-          className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-            tab === "solutions"
-              ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
-              : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
-          )}
-          type="button"
-          onClick={() => setTab("solutions")}
-        >
-          <ScrollText className="h-4 w-4" />
-          Решения
-        </button>
-        <button
-          className={cn(
-            "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-            tab === "patterns"
-              ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
-              : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
-          )}
-          type="button"
-          onClick={() => setTab("patterns")}
-        >
-          <BookOpen className="h-4 w-4" />
-          Паттерны
-        </button>
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
+        <Tabs className="min-w-0" value={tab} onValueChange={changeTab}>
+          <TabsList className="h-8 bg-transparent p-0" variant="line">
+            <TabsTrigger
+              className="h-8 rounded-md px-3 text-sm text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"
+              value="description"
+            >
+              <FileText className="h-4 w-4" />
+              Описание
+            </TabsTrigger>
+            <TabsTrigger
+              className="h-8 rounded-md px-3 text-sm text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"
+              value="solutions"
+            >
+              <ScrollText className="h-4 w-4" />
+              Решения
+            </TabsTrigger>
+            <TabsTrigger
+              className="h-8 rounded-md px-3 text-sm text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"
+              value="patterns"
+            >
+              <BookOpen className="h-4 w-4" />
+              Паттерны
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         {solved ? (
           <div className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[var(--lc-success)]">
             <CheckCircle2 className="h-4 w-4" />
@@ -121,7 +134,11 @@ export function ProblemDescriptionPanel({
         ) : null}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto p-5">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-auto p-5"
+        onScroll={() => rememberScroll(tab)}
+      >
         {tab === "description" ? (
           <div>
             <div className="mb-5 flex items-start justify-between gap-4">
@@ -143,13 +160,13 @@ export function ProblemDescriptionPanel({
               </div>
               <Button onClick={() => setEditingMarkdown((value) => !value)} variant="ghost">
                 <EditIcon className="h-4 w-4" />
-                {editingMarkdown ? "Preview" : "Edit"}
+                {editingMarkdown ? "Предпросмотр" : "Править"}
               </Button>
             </div>
 
             {editingMarkdown ? (
               <Textarea
-                className="min-h-[420px] resize-y font-mono leading-6"
+                className="min-h-[420px] resize-y font-mono text-xs leading-5"
                 value={problem.descriptionMarkdown}
                 onChange={(event) =>
                   onChange({ ...problem, descriptionMarkdown: event.target.value })
@@ -161,10 +178,12 @@ export function ProblemDescriptionPanel({
             )}
 
             <div className="mt-6 border-t border-[var(--lc-border)] pt-5">
-              <div className="mb-2 text-sm font-semibold text-[var(--lc-text-strong)]">Notes</div>
+              <div className="mb-2 text-sm font-semibold text-[var(--lc-text-strong)]">
+                Заметки
+              </div>
               <Textarea
-                className="min-h-40 resize-y font-mono leading-6"
-                placeholder="Write your idea, edge cases, or complexity notes here..."
+                className="min-h-40 resize-y font-mono text-xs leading-5"
+                placeholder="Идея решения, крайние случаи или сложность алгоритма..."
                 value={problem.notesMarkdown ?? ""}
                 onChange={(event) => onChange({ ...problem, notesMarkdown: event.target.value })}
                 spellCheck={false}

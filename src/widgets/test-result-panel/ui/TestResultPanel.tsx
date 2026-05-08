@@ -43,7 +43,7 @@ function ValueBlock({ label, value }: { label: string; value: string }) {
   return (
     <div className="mt-4">
       <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">{label}</div>
-      <pre className="overflow-auto rounded-lg bg-[var(--lc-code-strong)] p-3 font-mono text-sm leading-6 text-[var(--lc-text-strong)]">
+      <pre className="overflow-auto rounded-lg bg-[var(--lc-code-strong)] p-3 font-mono text-xs leading-5 text-[var(--lc-text-strong)]">
         {value || " "}
       </pre>
     </div>
@@ -73,7 +73,7 @@ function CaseTabs({
           <button
             key={testCase.id}
             className={cn(
-              "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors",
+              "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors",
               testCase.id === visibleCaseId
                 ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
                 : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",

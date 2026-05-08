@@ -30,14 +30,16 @@ export function ImportProblemsButton({
       const { problems, skippedCount } = convertNeenzaDataset(parsed);
 
       if (problems.length === 0) {
-        setStatus("No problems found");
+        setStatus("Задачи не найдены");
         return;
       }
 
       onImport(problems);
-      setStatus(`Imported ${problems.length}${skippedCount ? `, skipped ${skippedCount}` : ""}`);
+      setStatus(
+        `Импортировано задач: ${problems.length}${skippedCount ? `, пропущено: ${skippedCount}` : ""}`,
+      );
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Import failed");
+      setStatus(error instanceof Error ? error.message : "Не удалось импортировать задачи");
     } finally {
       if (inputRef.current) {
         inputRef.current.value = "";
@@ -49,9 +51,9 @@ export function ImportProblemsButton({
     <div>
       <input
         ref={inputRef}
+        accept="application/json,.json"
         className="hidden"
         type="file"
-        accept="application/json,.json"
         onChange={(event) => {
           const file = event.target.files?.[0];
 
@@ -61,13 +63,14 @@ export function ImportProblemsButton({
         }}
       />
       <Button
-        aria-label="Импортировать JSON с задачами"
-        size="icon"
-        title="Импортировать JSON с задачами"
+        aria-label="Импортировать задачи"
+        className="px-3"
+        title="Импортировать файл merged_problems.json из публичного датасета neenza"
         variant="secondary"
         onClick={() => inputRef.current?.click()}
       >
         <Upload className="h-4 w-4" />
+        Импорт задач
       </Button>
       {!onStatusChange && statusText ? (
         <div className="mt-2 text-xs text-[var(--lc-muted)]">{statusText}</div>

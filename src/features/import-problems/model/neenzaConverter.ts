@@ -9,6 +9,7 @@ type NeenzaExample = {
   example_num?: number;
   example_text?: string;
   text?: string;
+  images?: string[];
 };
 
 type NeenzaProblem = {
@@ -268,21 +269,91 @@ function normalizeExamples(problem: NeenzaProblem, problemId: string) {
     .filter((testCase): testCase is TestCase => Boolean(testCase));
 }
 
-function buildDescriptionMarkdown(problem: NeenzaProblem, title: string, number: number) {
-  const parts = [`# ${number ? `${number}. ` : ""}${title}`];
+function normalizeExampleMarkdownText(text: string) {
+  return text.replace(/\r\n/g, "\n").trim();
+}
 
-  if (problem.description) {
-    parts.push(problem.description.trim());
-  } else if (problem.content) {
-    parts.push(problem.content.trim());
-  } else {
-    parts.push("Paste the problem description here.");
+function getExampleMarkdownEntries(problem: NeenzaProblem) {
+  if (typeof problem.examples === "string") {
+    const text = normalizeExampleMarkdownText(problem.examples);
+    return text ? [{ number: 1, text }] : [];
   }
 
-  if (Array.isArray(problem.constraints) && problem.constraints.length > 0) {
-    parts.push(
-      `## Constraints\n\n${problem.constraints.map((constraint) => `- ${constraint}`).join("\n")}`,
-    );
+  if (!Array.isArray(problem.examples)) {
+    return [];
+  }
+
+  return problem.examples
+    .map((example, index) => ({
+      number: example.example_num ?? index + 1,
+      text: normalizeExampleMarkdownText(example.example_text ?? example.text ?? ""),
+    }))
+    .filter((example) => example.text);
+}
+
+function stripExampleBlocks(description: string) {
+  return description.replace(
+    /\n?\s*Example\s+\d+\s*:?\s*[\s\S]*?(?=\n\s*(?:Example\s+\d+\s*:|Constraints\s*:|Follow[- ]?up\s*:|Note\s*:)|$)/gi,
+    "\n",
+  );
+}
+
+function stripConstraintsBlock(description: string) {
+  return description.replace(
+    /\n?\s*Constraints\s*:?\s*[\s\S]*?(?=\n\s*(?:Example\s+\d+\s*:|Follow[- ]?up\s*:|Note\s*:)|$)/gi,
+    "\n",
+  );
+}
+
+function cleanDescriptionText(description: string, options: { stripExamples: boolean; stripConstraints: boolean }) {
+  let cleanDescription = description.replace(/\r\n/g, "\n").trim();
+
+  if (options.stripExamples) {
+    cleanDescription = stripExampleBlocks(cleanDescription);
+  } else {
+    cleanDescription = cleanDescription.replace(/^\s*Example\s+\d+\s*:?\s*$/gim, "");
+  }
+
+  if (options.stripConstraints) {
+    cleanDescription = stripConstraintsBlock(cleanDescription);
+  } else {
+    cleanDescription = cleanDescription.replace(/^\s*Constraints\s*:?\s*$/gim, "");
+  }
+
+  return cleanDescription
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function buildExamplesMarkdown(problem: NeenzaProblem) {
+  const examples = getExampleMarkdownEntries(problem);
+
+  return examples.map((example) => {
+    const text = example.text.replace(/```/g, "'''");
+
+    return `## Example ${example.number}:\n\n\`\`\`text\n${text}\n\`\`\``;
+  });
+}
+
+function buildDescriptionMarkdown(problem: NeenzaProblem, title: string, number: number) {
+  const parts = [`# ${number ? `${number}. ` : ""}${title}`];
+  const examplesMarkdown = buildExamplesMarkdown(problem);
+  const constraints = Array.isArray(problem.constraints) ? problem.constraints : [];
+  const hasConstraints = constraints.length > 0;
+  const rawDescription = String(problem.description ?? problem.content ?? "");
+  const description = cleanDescriptionText(rawDescription, {
+    stripExamples: examplesMarkdown.length > 0,
+    stripConstraints: hasConstraints,
+  });
+
+  if (description) {
+    parts.push(description);
+  }
+
+  parts.push(...examplesMarkdown);
+
+  if (hasConstraints) {
+    parts.push(`## Constraints\n\n${constraints.map((constraint) => `- ${constraint}`).join("\n")}`);
   }
 
   if (Array.isArray(problem.hints) && problem.hints.length > 0) {

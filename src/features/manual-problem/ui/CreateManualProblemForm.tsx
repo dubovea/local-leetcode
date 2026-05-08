@@ -3,6 +3,13 @@ import type { Difficulty, Problem } from "@/entities/problem/model/types";
 import { createId } from "@/shared/lib/id";
 import { Button } from "@/shared/ui/button";
 import { Input } from "@/shared/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select";
 
 function toSlug(title: string) {
   return (
@@ -36,13 +43,13 @@ export function CreateManualProblemForm({
   onCancel: () => void;
   onCreate: (problem: Problem) => void;
 }) {
-  const [title, setTitle] = useState("Custom Problem");
+  const [title, setTitle] = useState("Своя задача");
   const [number, setNumber] = useState(String(nextNumber));
   const [difficulty, setDifficulty] = useState<Difficulty>("Medium");
   const [functionName, setFunctionName] = useState("solution");
 
   function createProblem() {
-    const cleanTitle = title.trim() || "Custom Problem";
+    const cleanTitle = title.trim() || "Своя задача";
     const cleanNumber = Number(number);
     const problemNumber =
       Number.isFinite(cleanNumber) && cleanNumber > 0 ? cleanNumber : nextNumber;
@@ -59,9 +66,9 @@ export function CreateManualProblemForm({
       topics: [],
       functionName: cleanFunctionName,
       judgeMode: "exact",
-      descriptionMarkdown: `# ${problemNumber}. ${cleanTitle}\n\nWrite the problem description in Markdown.`,
+      descriptionMarkdown: `# ${problemNumber}. ${cleanTitle}\n\nОпишите условие задачи в Markdown.`,
       notesMarkdown: "",
-      code: `/**\n * Write your solution here.\n */\nvar ${cleanFunctionName} = function (...args) {\n  console.log(args);\n};`,
+      code: `/**\n * Напишите решение здесь.\n */\nvar ${cleanFunctionName} = function (...args) {\n  console.log(args);\n};`,
       testCases: [{ id: createId("case"), input: "", expected: "undefined" }],
       submissions: [],
     });
@@ -70,10 +77,10 @@ export function CreateManualProblemForm({
   return (
     <div className="rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-3">
       <div className="mb-3 text-sm font-semibold text-[var(--lc-text-strong)]">
-        New manual problem
+        Новая своя задача
       </div>
 
-      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Title</label>
+      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Название</label>
       <Input
         className="mb-3"
         value={title}
@@ -88,7 +95,7 @@ export function CreateManualProblemForm({
 
       <div className="mb-3 grid grid-cols-2 gap-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Number</label>
+          <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Номер</label>
           <Input
             inputMode="numeric"
             value={number}
@@ -97,21 +104,30 @@ export function CreateManualProblemForm({
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">
-            Difficulty
+            Сложность
           </label>
-          <select
-            className="h-9 w-full rounded-md border border-[var(--lc-border)] bg-[var(--lc-input-strong)] px-3 text-sm text-[var(--lc-text-strong)] outline-none focus:border-[var(--lc-border-strong)]"
+          <Select
             value={difficulty}
-            onChange={(event) => setDifficulty(event.target.value as Difficulty)}
+            onValueChange={(value) => setDifficulty(value as Difficulty)}
           >
-            <option>Easy</option>
-            <option>Medium</option>
-            <option>Hard</option>
-          </select>
+            <SelectTrigger
+              aria-label="Сложность"
+              className="h-8 w-full border-[var(--lc-border)] bg-[var(--lc-panel)] text-[var(--lc-text-strong)]"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[var(--lc-panel-raised)]">
+              <SelectItem value="Easy">Лёгкая</SelectItem>
+              <SelectItem value="Medium">Средняя</SelectItem>
+              <SelectItem value="Hard">Сложная</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">Function name</label>
+      <label className="mb-1 block text-xs font-medium text-[var(--lc-muted)]">
+        Имя функции
+      </label>
       <Input
         className="mb-3 font-mono"
         value={functionName}
@@ -120,10 +136,10 @@ export function CreateManualProblemForm({
 
       <div className="flex justify-end gap-2">
         <Button className="h-8 px-3 text-xs" onClick={onCancel} variant="ghost">
-          Cancel
+          Отмена
         </Button>
         <Button className="h-8 px-3 text-xs" onClick={createProblem}>
-          Create
+          Создать
         </Button>
       </div>
     </div>

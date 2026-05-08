@@ -1,7 +1,13 @@
 import { useRef } from "react";
-import { Download, UploadCloud } from "lucide-react";
+import { Download, MoreHorizontal, Trash2, UploadCloud } from "lucide-react";
 import type { Problem, ProblemsBackup } from "@/entities/problem/model/types";
 import { Button } from "@/shared/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/shared/ui/dropdown-menu";
 
 function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -31,16 +37,18 @@ function parseBackup(value: unknown): ProblemsBackup | Problem[] {
     return value as ProblemsBackup;
   }
 
-  throw new Error("Unsupported backup JSON format");
+  throw new Error("Неподдерживаемый формат бэкапа");
 }
 
 export function BackupButtons({
   onExport,
   onImport,
+  onReset,
   onStatusChange,
 }: {
   onExport: () => Promise<ProblemsBackup>;
   onImport: (backup: ProblemsBackup | Problem[]) => Promise<void>;
+  onReset: () => void;
   onStatusChange: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -50,7 +58,7 @@ export function BackupButtons({
     const date = new Date().toISOString().slice(0, 10);
 
     downloadJson(`medikcode-backup-${date}.json`, backup);
-    onStatusChange(`Backup exported: ${backup.problems.length} problems`);
+    onStatusChange(`Бэкап экспортирован: ${backup.problems.length} задач`);
   }
 
   async function importBackup(file: File) {
@@ -60,9 +68,9 @@ export function BackupButtons({
       const count = Array.isArray(parsed) ? parsed.length : parsed.problems.length;
 
       await onImport(parsed);
-      onStatusChange(`Backup imported: ${count} problems`);
+      onStatusChange(`Бэкап импортирован: ${count} задач`);
     } catch (error) {
-      onStatusChange(error instanceof Error ? error.message : "Backup import failed");
+      onStatusChange(error instanceof Error ? error.message : "Не удалось импортировать бэкап");
     } finally {
       if (inputRef.current) {
         inputRef.current.value = "";
@@ -71,12 +79,12 @@ export function BackupButtons({
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div>
       <input
         ref={inputRef}
+        accept="application/json,.json"
         className="hidden"
         type="file"
-        accept="application/json,.json"
         onChange={(event) => {
           const file = event.target.files?.[0];
 
@@ -85,14 +93,32 @@ export function BackupButtons({
           }
         }}
       />
-      <Button className="flex-1" variant="ghost" onClick={() => void exportBackup()}>
-        <Download className="h-4 w-4" />
-        Export backup
-      </Button>
-      <Button className="flex-1" variant="ghost" onClick={() => inputRef.current?.click()}>
-        <UploadCloud className="h-4 w-4" />
-        Import backup
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label="Действия с данными"
+            size="icon"
+            title="Бэкап и очистка задач"
+            variant="secondary"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-52">
+          <DropdownMenuItem onSelect={() => void exportBackup()}>
+            <Download className="h-4 w-4" />
+            Экспорт бэкапа
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => inputRef.current?.click()}>
+            <UploadCloud className="h-4 w-4" />
+            Импорт бэкапа
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={onReset}>
+            <Trash2 className="h-4 w-4" />
+            Удалить все задачи
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

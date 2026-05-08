@@ -1,6 +1,9 @@
+import Editor from "@monaco-editor/react";
 import { useMemo } from "react";
+import type * as Monaco from "monaco-editor";
 import type { ProblemListItem } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
+import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/cn";
 
 type PatternVisualType =
@@ -45,12 +48,18 @@ const patterns: Pattern[] = [
       "Один раз построй массив префиксов, а затем отвечай на каждый запрос вычитанием двух значений.",
     complexity: "Построение O(n), запрос O(1), память O(n).",
     code: `function rangeSum(nums, left, right) {
+  // Пример: nums = [2, 1, 5, 3], left = 1, right = 3.
+  // Хотим быстро получить сумму nums[1] + nums[2] + nums[3] = 9.
+  // prefix[i] хранит сумму первых i элементов, поэтому prefix[0] = 0.
   const prefix = [0];
 
   for (const num of nums) {
+    // На каждом шаге добавляем текущий элемент к уже известной сумме.
     prefix.push(prefix[prefix.length - 1] + num);
   }
 
+  // Сумма от left до right равна сумме первых right + 1 элементов
+  // без суммы элементов, стоящих до left.
   return prefix[right + 1] - prefix[left];
 }`,
     problems: ["Range Sum Query - Immutable", "Subarray Sum Equals K", "Continuous Subarray Sum"],
@@ -63,13 +72,21 @@ const patterns: Pattern[] = [
       "Двигай тот указатель, который приближает состояние к цели, и остановись, когда указатели пересекутся.",
     complexity: "Обычно O(n) по времени и O(1) по памяти.",
     code: `function twoSumSorted(nums, target) {
+  // Пример: nums = [1, 2, 4, 6, 8], target = 10.
+  // Массив отсортирован, значит можно смотреть на самую маленькую
+  // и самую большую кандидатуры одновременно.
   let left = 0;
   let right = nums.length - 1;
 
   while (left < right) {
     const sum = nums[left] + nums[right];
+
+    // Если сумма совпала, оба указателя стоят на ответе.
     if (sum === target) return [left, right];
+
+    // Сумма мала: увеличиваем её, двигая левый указатель вправо.
     if (sum < target) left += 1;
+    // Сумма велика: уменьшаем её, двигая правый указатель влево.
     else right -= 1;
   }
 
@@ -91,12 +108,19 @@ const patterns: Pattern[] = [
       "Расширяй правую границу, сжимай левую, когда окно нарушает правило, и обновляй ответ.",
     complexity: "O(n), потому что каждая граница движется вперёд не больше n раз.",
     code: `function maxSumOfSizeK(nums, k) {
+  // Пример: nums = [2, 1, 5, 1, 3, 2], k = 3.
+  // Окно всегда содержит ровно k элементов, а sum хранит их сумму.
   let sum = 0;
   let best = -Infinity;
 
   for (let right = 0; right < nums.length; right += 1) {
+    // Добавляем новый правый элемент в окно.
     sum += nums[right];
+
+    // Если окно стало больше k, убираем элемент, который вышел слева.
     if (right >= k) sum -= nums[right - k];
+
+    // Когда окно достигло размера k, обновляем лучший ответ.
     if (right >= k - 1) best = Math.max(best, sum);
   }
 
@@ -116,15 +140,20 @@ const patterns: Pattern[] = [
     approach: "Один указатель двигается на шаг, второй на два; встреча обычно доказывает цикл.",
     complexity: "O(n) по времени и O(1) по памяти.",
     code: `function hasCycle(head) {
+  // Пример: 3 -> 2 -> 0 -> -4, где -4 снова указывает на 2.
+  // slow делает один шаг, fast делает два шага.
   let slow = head;
   let fast = head;
 
   while (fast && fast.next) {
     slow = slow.next;
     fast = fast.next.next;
+
+    // Если цикл есть, быстрый указатель догонит медленный внутри цикла.
     if (slow === fast) return true;
   }
 
+  // Если fast дошёл до конца, цикла нет.
   return false;
 }`,
     problems: [
@@ -142,16 +171,24 @@ const patterns: Pattern[] = [
     approach: "Храни previous, current и next; на каждом шаге перенаправляй current.next назад.",
     complexity: "O(n) по времени и O(1) по памяти.",
     code: `function reverseList(head) {
+  // Пример: 1 -> 2 -> 3 станет 3 -> 2 -> 1.
+  // previous хранит уже развёрнутую часть списка.
   let previous = null;
   let current = head;
 
   while (current) {
+    // Сохраняем следующий узел, иначе потеряем хвост списка.
     const next = current.next;
+
+    // Разворачиваем связь текущего узла назад.
     current.next = previous;
+
+    // Сдвигаем окно из двух указателей на один узел вперёд.
     previous = current;
     current = next;
   }
 
+  // previous теперь указывает на новую голову.
   return previous;
 }`,
     problems: [
@@ -169,13 +206,19 @@ const patterns: Pattern[] = [
       "Поддерживай значения в стеке упорядоченными; доставай элементы, когда текущий элемент даёт для них ответ.",
     complexity: "O(n) по времени и O(n) по памяти.",
     code: `function nextGreater(nums) {
+  // Пример: nums = [2, 1, 2, 4, 3].
+  // Для каждого индекса ищем ближайшее число справа, которое больше него.
   const answer = Array(nums.length).fill(-1);
-  const stack = [];
+  const stack = []; // храним индексы, для которых ответ ещё не найден
 
   for (let i = 0; i < nums.length; i += 1) {
+    // Текущее число закрывает все меньшие элементы на вершине стека.
     while (stack.length && nums[i] > nums[stack[stack.length - 1]]) {
-      answer[stack.pop()] = nums[i];
+      const index = stack.pop();
+      answer[index] = nums[i];
     }
+
+    // Текущий индекс ждёт свой будущий больший элемент.
     stack.push(i);
   }
 
@@ -196,10 +239,12 @@ const patterns: Pattern[] = [
       "Держи только K кандидатов в куче или сортируй, если вход маленький и важнее простота.",
     complexity: "Куча O(n log k), память O(k). Сортировка O(n log n).",
     code: `function topKBySorting(nums, k) {
+  // Пример: nums = [3, 2, 1, 5, 6, 4], k = 2.
+  // Для небольших входов сортировка проще и хорошо читается.
   return nums
-    .slice()
-    .sort((a, b) => b - a)
-    .slice(0, k);
+    .slice() // копируем, чтобы не менять исходный массив
+    .sort((a, b) => b - a) // большие элементы идут первыми
+    .slice(0, k); // берём ровно k лучших кандидатов
 }`,
     problems: [
       "Kth Largest Element in an Array",
@@ -215,13 +260,22 @@ const patterns: Pattern[] = [
     approach: "Отсортируй по началу, затем сравнивай текущий интервал с последним добавленным.",
     complexity: "O(n log n) из-за сортировки, O(n) памяти на результат.",
     code: `function mergeIntervals(intervals) {
+  // Пример: [[1,3], [2,6], [8,10]] -> [[1,6], [8,10]].
+  // Сортировка гарантирует, что потенциальное пересечение может быть
+  // только с последним интервалом в результате.
   intervals.sort((a, b) => a[0] - b[0]);
   const merged = [];
 
   for (const interval of intervals) {
     const last = merged[merged.length - 1];
-    if (!last || last[1] < interval[0]) merged.push(interval);
-    else last[1] = Math.max(last[1], interval[1]);
+
+    // Если результата ещё нет или пересечения нет, начинаем новый интервал.
+    if (!last || last[1] < interval[0]) {
+      merged.push(interval);
+    } else {
+      // Иначе расширяем правую границу последнего интервала.
+      last[1] = Math.max(last[1], interval[1]);
+    }
   }
 
   return merged;
@@ -241,10 +295,18 @@ const patterns: Pattern[] = [
     approach: "Сведи задачу к условию true/false и сужай диапазон вокруг этой границы.",
     complexity: "O(log n) по времени и O(1) по памяти.",
     code: `function firstTrue(left, right, condition) {
+  // Пример: ищем первый индекс, где nums[i] >= target.
+  // condition(mid) отвечает: "mid уже достаточно правый?"
   while (left < right) {
     const mid = left + Math.floor((right - left) / 2);
-    if (condition(mid)) right = mid;
-    else left = mid + 1;
+
+    if (condition(mid)) {
+      // mid подходит, значит ответ может быть mid или левее.
+      right = mid;
+    } else {
+      // mid не подходит, значит ответ строго правее.
+      left = mid + 1;
+    }
   }
 
   return left;
@@ -263,10 +325,12 @@ const patterns: Pattern[] = [
     approach: "Выбирай DFS для структурной рекурсии или BFS, когда важны уровни.",
     complexity: "O(n) по времени; память зависит от глубины рекурсии или ширины очереди.",
     code: `function inorder(root, output = []) {
+  // Пример BST: [2, 1, 3] при inorder даст [1, 2, 3].
+  // Inorder сначала обходит левое поддерево, потом корень, потом правое.
   if (!root) return output;
 
   inorder(root.left, output);
-  output.push(root.val);
+  output.push(root.val); // здесь "посещаем" текущий узел
   inorder(root.right, output);
 
   return output;
@@ -286,11 +350,15 @@ const patterns: Pattern[] = [
       "Иди глубоко через рекурсию или стек и отмечай посещённые узлы, чтобы не зациклиться.",
     complexity: "O(V + E) для графов; O(n) для деревьев.",
     code: `function dfs(graph, start, seen = new Set()) {
+  // Пример: graph = { A: ["B", "C"], B: ["D"], C: [], D: [] }.
+  // DFS сначала уходит как можно глубже по одной ветке.
   if (seen.has(start)) return [];
-  seen.add(start);
 
-  const order = [start];
+  seen.add(start); // защищаемся от циклов
+  const order = [start]; // фиксируем порядок посещения
+
   for (const next of graph[start] ?? []) {
+    // Рекурсивно добавляем все достижимые вершины из соседа.
     order.push(...dfs(graph, next, seen));
   }
 
@@ -305,6 +373,8 @@ const patterns: Pattern[] = [
     approach: "Используй очередь: обработай текущий фронт и добавь следующий.",
     complexity: "O(V + E) для графов; O(n) для деревьев.",
     code: `function bfs(graph, start) {
+  // Пример: ищем порядок обхода от вершины A.
+  // Queue хранит вершины текущего и следующих уровней.
   const queue = [start];
   const seen = new Set([start]);
   const order = [];
@@ -312,10 +382,11 @@ const patterns: Pattern[] = [
   for (let i = 0; i < queue.length; i += 1) {
     const node = queue[i];
     order.push(node);
+
     for (const next of graph[node] ?? []) {
       if (!seen.has(next)) {
-        seen.add(next);
-        queue.push(next);
+        seen.add(next); // добавляем один раз, чтобы не ходить по кругу
+        queue.push(next); // попадёт в обработку после текущего уровня
       }
     }
   }
@@ -330,9 +401,16 @@ const patterns: Pattern[] = [
     signal: "2D-сетки, острова, заливка, кратчайший путь или маркировка областей.",
     approach: "Считай клетки узлами графа и ходи по валидным соседям через DFS или BFS.",
     complexity: "O(rows * cols) по времени и памяти в худшем случае.",
-    code: `const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    code: `const directions = [
+  [1, 0],  // вниз
+  [-1, 0], // вверх
+  [0, 1],  // вправо
+  [0, -1], // влево
+];
 
 function neighbors(row, col, grid) {
+  // Пример: из клетки (1, 1) проверяем четыре соседние клетки.
+  // grid[r]?.[c] защищает от выхода за границы матрицы.
   return directions
     .map(([dr, dc]) => [row + dr, col + dc])
     .filter(([r, c]) => grid[r]?.[c] !== undefined);
@@ -345,18 +423,23 @@ function neighbors(row, col, grid) {
     signal:
       "Нужно перебрать все валидные выборы, перестановки, комбинации или раскладки с ограничениями.",
     approach: "Сделай выбор, уйди в рекурсию, затем откати выбор перед следующей веткой.",
-    complexity: "Часто экспоненциальная; память — глубина рекурсии плюс размер ответа.",
+    complexity: "Часто экспоненциальная; память - глубина рекурсии плюс размер ответа.",
     code: `function subsets(nums) {
+  // Пример: nums = [1, 2] -> [], [2], [1], [1, 2].
+  // path хранит текущий частичный выбор.
   const result = [];
   const path = [];
 
   function search(index) {
     if (index === nums.length) {
-      result.push([...path]);
+      result.push([...path]); // копируем, потому что path будет меняться
       return;
     }
 
+    // Ветка 1: не берём nums[index].
     search(index + 1);
+
+    // Ветка 2: берём nums[index], затем откатываем выбор.
     path.push(nums[index]);
     search(index + 1);
     path.pop();
@@ -375,10 +458,13 @@ function neighbors(row, col, grid) {
     approach: "Сначала зафиксируй состояние, переход, базовые случаи и порядок обхода.",
     complexity: "Обычно O(количество состояний * стоимость перехода).",
     code: `function climbStairs(n) {
-  let prev = 1;
-  let curr = 1;
+  // Пример: n = 5. На последнюю ступень можно прийти с n-1 или n-2.
+  // curr хранит способов для текущей ступени, prev - для предыдущей.
+  let prev = 1; // способов добраться до ступени 0
+  let curr = 1; // способов добраться до ступени 1
 
   for (let step = 2; step <= n; step += 1) {
+    // Переход: dp[step] = dp[step - 1] + dp[step - 2].
     const next = prev + curr;
     prev = curr;
     curr = next;
@@ -403,9 +489,12 @@ function neighbors(row, col, grid) {
       "Используй сдвиги, маски и свойства XOR, чтобы компактно хранить состояние или убирать дубликаты.",
     complexity: "Часто O(n) по времени и O(1) по памяти.",
     code: `function singleNumber(nums) {
+  // Пример: [4, 1, 2, 1, 2] -> 4.
+  // XOR одинаковых чисел даёт 0, а x ^ 0 снова даёт x.
   let answer = 0;
 
   for (const num of nums) {
+    // Парные значения взаимно уничтожаются.
     answer ^= num;
   }
 
@@ -443,6 +532,77 @@ function buildProblemLookup(problems: ProblemListItem[]): ProblemLookup {
 
 function resolveProblem(title: string, lookup: ProblemLookup) {
   return lookup.exact.get(normalizeTitle(title)) ?? lookup.compact.get(compactTitle(title));
+}
+
+function definePatternThemes(monaco: typeof Monaco) {
+  monaco.editor.defineTheme("medikcode-pattern-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": "#171717",
+      "editorLineNumber.foreground": "#777777",
+      "editorCursor.foreground": "#ffffff",
+      "editor.selectionBackground": "#3a3d41",
+    },
+  });
+  monaco.editor.defineTheme("medikcode-pattern-light", {
+    base: "vs",
+    inherit: true,
+    rules: [],
+    colors: {
+      "editor.background": "#f7f7f8",
+      "editorLineNumber.foreground": "#8a8a8a",
+      "editorCursor.foreground": "#111827",
+      "editor.selectionBackground": "#dbeafe",
+    },
+  });
+}
+
+function codeHeight(code: string) {
+  const lineCount = code.split("\n").length;
+  return Math.min(460, Math.max(190, lineCount * 20 + 22));
+}
+
+function PatternCodeBlock({ code, title }: { code: string; title: string }) {
+  return (
+    <div className="mt-4 overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-code)]">
+      <Editor
+        beforeMount={definePatternThemes}
+        defaultLanguage="javascript"
+        height={codeHeight(code)}
+        options={{
+          automaticLayout: true,
+          contextmenu: false,
+          domReadOnly: true,
+          folding: false,
+          fontFamily: "JetBrains Mono, Consolas, monospace",
+          fontSize: 12,
+          lineDecorationsWidth: 8,
+          lineNumbers: "on",
+          lineNumbersMinChars: 3,
+          minimap: { enabled: false },
+          overviewRulerLanes: 0,
+          readOnly: true,
+          renderLineHighlight: "none",
+          scrollBeyondLastLine: false,
+          scrollbar: {
+            horizontal: "auto",
+            vertical: "auto",
+            verticalScrollbarSize: 8,
+          },
+          wordWrap: "on",
+        }}
+        path={`pattern-${title}.js`}
+        theme={
+          document.documentElement.dataset.theme === "light"
+            ? "medikcode-pattern-light"
+            : "medikcode-pattern-dark"
+        }
+        value={code}
+      />
+    </div>
+  );
 }
 
 function PatternVisual({ type, title }: { type: PatternVisualType; title: string }) {
@@ -700,15 +860,16 @@ function ProblemLink({
   }
 
   return (
-    <button
-      className="inline-flex max-w-full items-center gap-2 rounded-md border border-[var(--lc-border)] bg-[var(--lc-panel)] px-2 py-1 text-left text-xs text-[var(--lc-text-strong)] transition-colors hover:bg-[var(--lc-hover)]"
+    <Button
+      className="max-w-full justify-start border-[var(--lc-border)] bg-[var(--lc-panel)] px-2 py-1 text-left text-xs text-[var(--lc-text-strong)]"
+      size="xs"
       title={`Открыть задачу ${problem.title}`}
-      type="button"
+      variant="outline"
       onClick={() => onSelectProblem(problem.id)}
     >
       <span className="truncate">{problem.title}</span>
       <DifficultyBadge difficulty={problem.difficulty} />
-    </button>
+    </Button>
   );
 }
 
@@ -770,9 +931,7 @@ export function PatternGuide({
             </div>
           </div>
 
-          <pre className="mt-4 overflow-auto rounded-lg border border-[var(--lc-border)] bg-[var(--lc-code)] p-3 text-xs leading-5 text-[var(--lc-text-strong)]">
-            <code>{pattern.code}</code>
-          </pre>
+          <PatternCodeBlock code={pattern.code} title={pattern.title} />
 
           <div className="mt-3">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--lc-muted)]">

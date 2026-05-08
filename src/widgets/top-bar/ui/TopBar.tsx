@@ -28,15 +28,15 @@ export function TopBar({
           M
         </div>
         <div className="text-[15px] font-semibold text-[var(--lc-text-strong)]">MedikCode</div>
-        <button
-          className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[15px] font-semibold text-[var(--lc-text-strong)] transition-colors hover:bg-[var(--lc-hover)]"
-          type="button"
+        <Button
+          className="min-w-0 px-2 text-[15px] font-semibold text-[var(--lc-text-strong)]"
+          variant="ghost"
           onClick={onOpenProblemList}
         >
           <List className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
           <span className="truncate">Задачи</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex items-center gap-2">

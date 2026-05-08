@@ -24,19 +24,35 @@ import { cn } from "@/shared/lib/cn";
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Input } from "@/shared/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select";
 import { ImportProblemsButton } from "@/features/import-problems/ui/ImportProblemsButton";
 import { CreateManualProblemForm } from "@/features/manual-problem/ui/CreateManualProblemForm";
 import { BackupButtons } from "@/features/backup-problems/ui/BackupButtons";
 
 type StatusFilter = "all" | "solved" | "unsolved";
 type DifficultyFilter = "all" | Difficulty;
+type FilterOption<T extends string = string> = {
+  value: T;
+  label: string;
+};
 
-const difficultyFilters: Difficulty[] = ["Easy", "Medium", "Hard"];
+const difficultyOptions: FilterOption<DifficultyFilter>[] = [
+  { value: "all", label: "Любая сложность" },
+  { value: "Easy", label: "Лёгкая" },
+  { value: "Medium", label: "Средняя" },
+  { value: "Hard", label: "Сложная" },
+];
 
 const statusFilterTitle: Record<StatusFilter, string> = {
-  all: "Show all problems",
-  solved: "Show solved problems",
-  unsolved: "Show unsolved problems",
+  all: "Показать все задачи",
+  solved: "Показать решённые задачи",
+  unsolved: "Показать нерешённые задачи",
 };
 
 function Section({
@@ -100,6 +116,44 @@ function FilterButton({
   );
 }
 
+function FilterSelect<T extends string>({
+  icon,
+  label,
+  value,
+  options,
+  contentClassName,
+  onValueChange,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: T;
+  options: FilterOption<T>[];
+  contentClassName?: string;
+  onValueChange: (value: T) => void;
+}) {
+  return (
+    <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as T)}>
+      <SelectTrigger
+        aria-label={label}
+        className="h-9 w-full justify-between rounded-lg border-[var(--lc-border)] bg-[var(--lc-panel)] text-[var(--lc-text-strong)]"
+        title={label}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0 text-[var(--lc-subtle)]">{icon}</span>
+          <SelectValue />
+        </span>
+      </SelectTrigger>
+      <SelectContent className={cn("bg-[var(--lc-panel-raised)]", contentClassName)}>
+        {options.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function ProblemRow({
   item,
   activeProblemId,
@@ -138,10 +192,10 @@ function ProblemRow({
         <DifficultyBadge difficulty={item.difficulty} />
       </button>
       <Button
-        aria-label={`Delete ${item.title}`}
-        className="mr-1 h-7 w-7 border border-[var(--lc-danger-border)] bg-[var(--lc-danger-bg)] text-[var(--lc-danger-text)] opacity-75 hover:bg-[var(--lc-danger-soft)] hover:text-[var(--lc-danger-text)] hover:opacity-100 focus-visible:opacity-100"
+        aria-label={`Удалить задачу ${item.title}`}
+        className="mr-1 h-7 w-7 border border-[var(--lc-danger-border)] bg-[var(--lc-danger-bg)] text-[var(--lc-danger-text)] opacity-90 hover:bg-[var(--lc-danger-soft)] hover:text-[var(--lc-danger-text)] hover:opacity-100 focus-visible:opacity-100"
         size="icon"
-        title={`Delete ${item.title}`}
+        title={`Удалить задачу ${item.title}`}
         variant="ghost"
         onClick={() => onDelete(item)}
       >
@@ -220,6 +274,13 @@ export function ProblemListDrawer({
       ),
     [problemIndex],
   );
+  const topicOptions = useMemo<FilterOption[]>(
+    () => [
+      { value: "all", label: "Все темы" },
+      ...topics.map((topic) => ({ value: topic, label: topic })),
+    ],
+    [topics],
+  );
   const solvedCount = useMemo(
     () => problemIndex.filter((problem) => problem.solved).length,
     [problemIndex],
@@ -256,7 +317,7 @@ export function ProblemListDrawer({
 
   function resetProblems() {
     const confirmed = window.confirm(
-      "Delete all imported and manual problems? The default manual Group Anagrams task will remain.",
+      "Удалить все импортированные и свои задачи? Встроенные задачи MedikCode будут восстановлены.",
     );
 
     if (confirmed) {
@@ -268,7 +329,7 @@ export function ProblemListDrawer({
 
   function deleteProblem(item: ProblemListItem) {
     const confirmed = window.confirm(
-      `Delete "${item.title}"? This removes its code, notes, tests, and submissions.`,
+      `Удалить "${item.title}"? Будут удалены код, заметки, тесты и история решений.`,
     );
 
     if (confirmed) {
@@ -298,10 +359,10 @@ export function ProblemListDrawer({
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-semibold text-[var(--lc-text-strong)]">Задачи</h2>
             <span className="rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-xs text-[var(--lc-muted)]">
-              {solvedCount}/{problemIndex.length} Solved
+              {solvedCount}/{problemIndex.length} Решено
             </span>
           </div>
-          <Button aria-label="Close problem list" size="icon" variant="ghost" onClick={onClose}>
+          <Button aria-label="Закрыть список задач" size="icon" variant="ghost" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -313,22 +374,13 @@ export function ProblemListDrawer({
               Своя задача
             </Button>
             <ImportProblemsButton onImport={onImportProblems} onStatusChange={setImportStatus} />
-            <Button
-              aria-label="Удалить все задачи"
-              size="icon"
-              title="Удалить все задачи"
-              variant="destructive"
-              onClick={resetProblems}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+            <BackupButtons
+              onExport={onExportBackup}
+              onImport={onImportBackup}
+              onReset={resetProblems}
+              onStatusChange={setImportStatus}
+            />
           </div>
-
-          <BackupButtons
-            onExport={onExportBackup}
-            onImport={onImportBackup}
-            onStatusChange={setImportStatus}
-          />
 
           {importStatus ? (
             <div className="mt-3 mb-3 text-xs text-[var(--lc-muted)]">{importStatus}</div>
@@ -384,42 +436,22 @@ export function ProblemListDrawer({
           </div>
 
           <div className={cn("mt-3 grid gap-2", topics.length > 0 ? "grid-cols-2" : "grid-cols-1")}>
-            <div className="relative flex min-w-0 items-center gap-2 rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)] px-3">
-              <Gauge className="h-4 w-4 shrink-0 text-[var(--lc-subtle)]" />
-              <select
-                className="h-9 min-w-0 flex-1 appearance-none bg-transparent pr-7 text-sm text-[var(--lc-text-strong)]"
-                title="Filter by difficulty"
-                value={difficultyFilter}
-                onChange={(event) => setDifficultyFilter(event.target.value as DifficultyFilter)}
-              >
-                <option value="all">All difficulties</option>
-                {difficultyFilters.map((difficulty) => (
-                  <option key={difficulty} value={difficulty}>
-                    {difficulty}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-[var(--lc-subtle)]" />
-            </div>
-
+            <FilterSelect
+              icon={<Gauge className="h-4 w-4" />}
+              label="Фильтр по сложности"
+              options={difficultyOptions}
+              value={difficultyFilter}
+              onValueChange={setDifficultyFilter}
+            />
             {topics.length > 0 ? (
-              <div className="relative flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)] px-3">
-                <Tags className="h-4 w-4 shrink-0 text-[var(--lc-subtle)]" />
-                <select
-                  className="h-9 min-w-0 flex-1 appearance-none bg-transparent pr-7 text-sm text-[var(--lc-text-strong)]"
-                  title="Filter by topic"
-                  value={selectedTopic}
-                  onChange={(event) => setSelectedTopic(event.target.value)}
-                >
-                  <option value="all">All topics</option>
-                  {topics.map((topic) => (
-                    <option key={topic} value={topic}>
-                      {topic}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 h-4 w-4 text-[var(--lc-subtle)]" />
-              </div>
+              <FilterSelect
+                contentClassName="min-w-64"
+                icon={<Tags className="h-4 w-4" />}
+                label="Фильтр по теме"
+                options={topicOptions}
+                value={selectedTopic}
+                onValueChange={setSelectedTopic}
+              />
             ) : null}
           </div>
         </div>
@@ -451,12 +483,12 @@ export function ProblemListDrawer({
           <Section
             count={filteredIndex.manual.length}
             open={manualOpen}
-            title="Manual problems"
+            title="Свои задачи"
             onOpenChange={setManualOpen}
           >
             {filteredIndex.manual.length === 0 ? (
               <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">
-                Manual problems will appear here.
+                Свои задачи появятся здесь.
               </div>
             ) : (
               filteredIndex.manual.map((item) => (
