@@ -18,7 +18,8 @@ import type { Problem, ProblemListItem, ProblemsBackup, Submission } from "./typ
 
 const LEGACY_SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
 const SELECTED_PROBLEM_KEY = "medikcode:v1:selected-problem-id";
-const PATTERN_SEED_KEY = "medikcode:v1:pattern-problems-seeded";
+const PROBLEMS_INITIALIZED_KEY = "medikcode:v1:problems-initialized";
+const PATTERN_SEED_KEY = "medikcode:v2:pattern-problems-seeded";
 
 function getSeedProblems() {
   return [...generatedPatternProblems, ...generatedNeenzaProblems, ...defaultProblems];
@@ -36,6 +37,14 @@ function saveSelectedProblemId(problemId: string) {
 
 function clearSelectedProblemId() {
   localStorage.removeItem(SELECTED_PROBLEM_KEY);
+}
+
+function problemsInitialized() {
+  return localStorage.getItem(PROBLEMS_INITIALIZED_KEY) === "true";
+}
+
+function markProblemsInitialized() {
+  localStorage.setItem(PROBLEMS_INITIALIZED_KEY, "true");
 }
 
 function patternSeedImported() {
@@ -113,10 +122,14 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
   async initialize() {
     try {
       const hasStoredProblems = await hasProblemsInDb();
+      const initialized = problemsInitialized();
 
-      if (!hasStoredProblems) {
+      if (!hasStoredProblems && !initialized) {
         await putProblemsToDb(getSeedProblems().map(normalizeProblem));
+        markProblemsInitialized();
         markPatternSeedImported();
+      } else if (hasStoredProblems) {
+        markProblemsInitialized();
       }
 
       let index = await getProblemIndexFromDb();
@@ -253,6 +266,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }
 
     await deleteProblemFromDb(problemId);
+    markProblemsInitialized();
 
     const nextIndex = currentIndex.filter((item) => item.id !== problemId);
     const deletedActiveProblem = get().activeProblemId === problemId;
@@ -269,6 +283,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       saveSelectedProblemId(nextProblem.id);
     } else {
       clearSelectedProblemId();
+      markPatternSeedImported();
     }
 
     set({
@@ -307,6 +322,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     const nextProblem = normalizeProblem(problem);
 
     await putProblemToDb(nextProblem);
+    markProblemsInitialized();
     saveSelectedProblemId(nextProblem.id);
 
     set((state) => ({
@@ -329,6 +345,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     );
 
     await putProblemsToDb(mergedProblems);
+    markProblemsInitialized();
 
     const index = await getProblemIndexFromDb();
     const firstImportedProblem = mergedProblems[0] ?? null;
@@ -354,12 +371,16 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
     await clearProblemsDb();
     await putProblemsToDb(normalizedProblems);
+    markProblemsInitialized();
+    markPatternSeedImported();
 
     const index = await getProblemIndexFromDb();
     const activeProblem = index[0] ? await getProblemFromDb(index[0].id) : null;
 
     if (activeProblem) {
       saveSelectedProblemId(activeProblem.id);
+    } else {
+      clearSelectedProblemId();
     }
 
     set({
@@ -372,21 +393,15 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
   async resetProblems() {
     await clearProblemsDb();
-    await putProblemsToDb(getSeedProblems().map(normalizeProblem));
+    clearSelectedProblemId();
+    markProblemsInitialized();
     markPatternSeedImported();
 
-    const index = await getProblemIndexFromDb();
-    const activeProblem = index[0] ? await getProblemFromDb(index[0].id) : null;
-
-    if (activeProblem) {
-      saveSelectedProblemId(activeProblem.id);
-    }
-
     set({
-      activeProblem: activeProblem ? normalizeProblem(activeProblem) : null,
-      activeProblemId: activeProblem?.id ?? null,
+      activeProblem: null,
+      activeProblemId: null,
       errorText: "",
-      problemIndex: index,
+      problemIndex: [],
     });
   },
 }));

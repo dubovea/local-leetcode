@@ -9,6 +9,7 @@ import type {
 import { useProblemStore } from "@/entities/problem/model/problemStore";
 import { runInWorker } from "@/features/problem-runner/model/runInWorker";
 import { createId } from "@/shared/lib/id";
+import { Button } from "@/shared/ui/button";
 import { TopBar } from "@/widgets/top-bar/ui/TopBar";
 import { ProblemListDrawer } from "@/widgets/problem-list-drawer/ui/ProblemListDrawer";
 import { ProblemDescriptionPanel } from "@/widgets/problem-description/ui/ProblemDescriptionPanel";
@@ -219,7 +220,48 @@ export function ProblemPage() {
   }
 
   if (!activeProblem || !activeProblemId) {
-    return null;
+    return (
+      <div className="flex h-screen min-h-0 flex-col bg-[var(--lc-page)] text-[var(--lc-text)]">
+        <TopBar
+          actionsDisabled
+          theme={theme}
+          running={running}
+          onOpenProblemList={() => setDrawerOpen(true)}
+          onPlay={() => undefined}
+          onSubmit={() => undefined}
+          onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
+        />
+
+        <ProblemListDrawer
+          activeProblemId={activeProblemId}
+          open={drawerOpen}
+          problemIndex={problemIndex}
+          onClose={() => setDrawerOpen(false)}
+          onSelect={(problemId) => void handleSelectProblem(problemId)}
+          onCreateManual={(problem) => {
+            void addManualProblem(problem);
+            setDrawerOpen(false);
+          }}
+          onImportProblems={(problems) => void importProblems(problems)}
+          onExportBackup={exportBackup}
+          onImportBackup={handleImportBackup}
+          onResetProblems={() => void resetProblems()}
+          onDeleteProblem={(problemId) => void deleteProblem(problemId)}
+        />
+
+        <main className="flex flex-1 items-center justify-center p-6">
+          <div className="max-w-sm text-center">
+            <h1 className="mb-2 text-xl font-semibold text-[var(--lc-text-strong)]">
+              No problems yet
+            </h1>
+            <p className="mb-4 text-sm text-[var(--lc-muted)]">
+              Create a manual problem or import a backup to continue.
+            </p>
+            <Button onClick={() => setDrawerOpen(true)}>Open problems</Button>
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (

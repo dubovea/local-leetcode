@@ -236,7 +236,7 @@ const ProblemRow = memo(function ProblemRow({
   onDelete,
 }: {
   item: ProblemListItem;
-  activeProblemId: string;
+  activeProblemId: string | null;
   onSelect: (problemId: string) => void;
   onDelete: (item: ProblemListItem) => void;
 }) {
@@ -326,7 +326,7 @@ export function ProblemListDrawer({
 }: {
   open: boolean;
   problemIndex: ProblemListItem[];
-  activeProblemId: string;
+  activeProblemId: string | null;
   onClose: () => void;
   onSelect: (problemId: string) => void;
   onCreateManual: (problem: Problem) => void;
@@ -421,7 +421,7 @@ export function ProblemListDrawer({
 
   const resetProblems = useCallback(() => {
     const confirmed = window.confirm(
-      "Удалить все импортированные и свои задачи? Встроенные задачи MedikCode будут восстановлены.",
+      "Удалить все задачи? Встроенные задачи MedikCode тоже будут удалены.",
     );
 
     if (!confirmed) {

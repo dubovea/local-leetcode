@@ -4,6 +4,7 @@ import { Button } from "@/shared/ui/button";
 type AppTheme = "dark" | "light";
 
 export function TopBar({
+  actionsDisabled = false,
   onOpenProblemList,
   onPlay,
   onSubmit,
@@ -11,6 +12,7 @@ export function TopBar({
   running,
   theme,
 }: {
+  actionsDisabled?: boolean;
   onOpenProblemList: () => void;
   onPlay: () => void;
   onSubmit: () => void;
@@ -40,11 +42,16 @@ export function TopBar({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button className="min-w-24" disabled={running} onClick={onPlay}>
+        <Button className="min-w-24" disabled={actionsDisabled || running} onClick={onPlay}>
           <Play className="h-4 w-4" />
           Play
         </Button>
-        <Button className="min-w-24" disabled={running} onClick={onSubmit} variant="success">
+        <Button
+          className="min-w-24"
+          disabled={actionsDisabled || running}
+          onClick={onSubmit}
+          variant="success"
+        >
           <Send className="h-4 w-4" />
           Submit
         </Button>
