@@ -61,9 +61,9 @@ export function ImportProblemsButton({
         }}
       />
       <Button
-        aria-label="Import LeetCode JSON"
+        aria-label="Импортировать JSON с задачами"
         size="icon"
-        title="Import LeetCode JSON"
+        title="Импортировать JSON с задачами"
         variant="secondary"
         onClick={() => inputRef.current?.click()}
       >

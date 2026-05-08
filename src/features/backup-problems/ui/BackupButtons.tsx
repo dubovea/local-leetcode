@@ -16,7 +16,10 @@ function downloadJson(filename: string, data: unknown) {
 }
 
 function isProblemArray(value: unknown): value is Problem[] {
-  return Array.isArray(value) && value.every((item) => item && typeof item === "object" && "id" in item && "title" in item);
+  return (
+    Array.isArray(value) &&
+    value.every((item) => item && typeof item === "object" && "id" in item && "title" in item)
+  );
 }
 
 function parseBackup(value: unknown): ProblemsBackup | Problem[] {
@@ -46,7 +49,7 @@ export function BackupButtons({
     const backup = await onExport();
     const date = new Date().toISOString().slice(0, 10);
 
-    downloadJson(`local-leetcode-backup-${date}.json`, backup);
+    downloadJson(`medikcode-backup-${date}.json`, backup);
     onStatusChange(`Backup exported: ${backup.problems.length} problems`);
   }
 

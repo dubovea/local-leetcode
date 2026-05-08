@@ -42,7 +42,7 @@ export function createProblemFromCatalog(item: ProblemCatalogItem): Problem {
     descriptionMarkdown:
       item.source === "manual"
         ? `# ${item.number}. ${item.title}\n\nWrite the problem description in Markdown.`
-        : `# ${item.number}. ${item.title}\n\nPaste the Markdown description here.\n\nLeetCode link: ${item.url}`,
+        : `# ${item.number}. ${item.title}\n\nPaste the Markdown description here.\n\nSource link: ${item.url}`,
     code: `/**\n * Write your solution here.\n */\nvar solution = function (...args) {\n  console.log(args);\n};`,
     testCases: [{ id: `${item.id}-case-1`, input: "", expected: "undefined" }],
     submissions: [],

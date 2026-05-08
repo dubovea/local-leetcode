@@ -1,6 +1,6 @@
-# Local LeetCode
+# MedikCode
 
-Минимальный локальный LeetCode для JavaScript-задач: Markdown-описание, Monaco Editor, TestCase, Play/Submit, история решений и локальный бэкап.
+Минимальный локальный тренажёр для JavaScript-задач: Markdown-описание, Monaco Editor, TestCase, Play/Submit, история решений и локальный бэкап.
 
 ## Запуск
 
@@ -13,15 +13,15 @@ npm run dev
 
 ## Что есть
 
-- левый Drawer `Problem List`;
+- левый Drawer `Задачи`;
 - строка действий в Drawer:
   - `Manual problem` — добавить ручную задачу;
-  - иконка `Upload` — импортировать LeetCode/neenza JSON;
+  - иконка `Upload` — импортировать JSON с задачами;
   - иконка `Trash` — очистить список и вернуться к seed-задачам;
 - отдельные кнопки `Export backup` / `Import backup` для своих задач, решений, черновиков и заметок;
 - по умолчанию есть только одна задача — ручная `Group Anagrams`;
 - две категории задач:
-  - `LeetCode problems` — задачи из импорта;
+  - `Каталог задач` — задачи из импорта;
   - `Manual problems` — задачи, добавленные вручную и стартовая `Group Anagrams`;
 - категории можно свернуть/развернуть;
 - поиск по номеру, названию и slug;
@@ -34,7 +34,7 @@ npm run dev
 - Monaco Editor для JavaScript;
 - `Alt + Shift + F` — форматирование кода;
 - `Ctrl + Enter` — запуск текущего testcase;
-- TestCase в стиле LeetCode: `Input`, `Expected`, `Output`;
+- TestCase в знакомом формате: `Input`, `Expected`, `Output`;
 - несколько testcase на задачу;
 - `Play` — запускает все testcase без сохранения в Solutions;
 - `Submit` — запускает все testcase и сохраняет попытку в Solutions.
@@ -43,17 +43,17 @@ npm run dev
 
 - состояние задач переведено на `zustand`;
 - задачи хранятся в `IndexedDB`, а не большим JSON в `localStorage`;
-- `Problem List` хранит и рендерит только лёгкий индекс: `id`, `number`, `title`, `difficulty`, `source`, `solved`;
+- Drawer `Задачи` хранит и рендерит только лёгкий индекс: `id`, `number`, `title`, `difficulty`, `source`, `solved`;
 - полная задача загружается отдельно при выборе;
 - код не записывается в хранилище на каждый символ;
 - сохранение кода идёт debounce-ом через `700ms`;
 - `Play` всегда берёт актуальный код из редактора, даже если debounce ещё не успел сохранить его в `IndexedDB`;
 - Monaco Editor не пересоздаётся при каждом сохранении кода.
 
-## Импорт neenza/leetcode-problems через интерфейс
+## Импорт merged_problems.json через интерфейс
 
-1. Скачай файл `merged_problems.json` из `neenza/leetcode-problems`.
-2. Открой Drawer `Problem List`.
+1. Подготовь файл `merged_problems.json`.
+2. Открой Drawer `Задачи`.
 3. Нажми иконку `Upload`.
 4. Выбери скачанный JSON-файл.
 
@@ -98,7 +98,7 @@ Import backup
 - берёт JavaScript starter code из `code_snippets`;
 - определяет имя функции из starter code;
 - вытаскивает TestCase из блоков `Input:` / `Output:`;
-- задачи из neenza помечает как `source: "leetcode"`;
+- импортированные задачи помечает как внешний каталог;
 - ручные задачи помечает как `source: "manual"`.
 
 ## Проверка раннера и конвертера

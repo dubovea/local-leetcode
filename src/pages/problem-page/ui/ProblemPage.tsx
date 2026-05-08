@@ -17,7 +17,7 @@ import { CodeWorkspace } from "@/widgets/code-workspace/ui/CodeWorkspace";
 type BottomTab = "testcase" | "result";
 type AppTheme = "dark" | "light";
 
-const THEME_STORAGE_KEY = "local-leetcode:theme";
+const THEME_STORAGE_KEY = "medikcode:theme";
 
 function getInitialTheme(): AppTheme {
   const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -44,6 +44,7 @@ export function ProblemPage() {
   const activeProblem = useProblemStore((state) => state.activeProblem);
   const activeProblemId = useProblemStore((state) => state.activeProblemId);
   const addManualProblem = useProblemStore((state) => state.addManualProblem);
+  const deleteProblem = useProblemStore((state) => state.deleteProblem);
   const addSubmission = useProblemStore((state) => state.addSubmission);
   const deleteSubmission = useProblemStore((state) => state.deleteSubmission);
   const errorText = useProblemStore((state) => state.errorText);
@@ -218,12 +219,15 @@ export function ProblemPage() {
         onExportBackup={exportBackup}
         onImportBackup={handleImportBackup}
         onResetProblems={() => void resetProblems()}
+        onDeleteProblem={(problemId) => void deleteProblem(problemId)}
       />
 
       <main className="grid min-h-0 flex-1 grid-cols-[46%_54%] gap-2 p-2">
         <ProblemDescriptionPanel
           problem={activeProblem}
+          problemIndex={problemIndex}
           onChange={(problem) => void handleProblemChange(problem)}
+          onSelectProblem={(problemId) => void handleSelectProblem(problemId)}
           onRestoreSubmission={(submissionId) => void handleRestoreSubmission(submissionId)}
           onDeleteSubmission={(submissionId) => void handleDeleteSubmission(submissionId)}
         />

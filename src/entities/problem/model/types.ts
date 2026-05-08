@@ -80,6 +80,7 @@ export type ProblemListItem = {
   title: string;
   slug: string;
   difficulty: Difficulty;
+  topics?: string[];
   solved: boolean;
 };
 

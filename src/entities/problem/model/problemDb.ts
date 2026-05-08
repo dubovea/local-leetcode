@@ -61,6 +61,7 @@ function problemToListItem(problem: Problem): ProblemListItem {
     title: problem.title,
     slug: problem.slug,
     difficulty: problem.difficulty,
+    topics: problem.topics ?? [],
     solved: (problem.submissions ?? []).some((submission) => submission.status === "accepted"),
   };
 }
@@ -100,6 +101,11 @@ export async function putProblemToDb(problem: Problem) {
   await requestToPromise(store.put(problem));
 
   return problemToListItem(problem);
+}
+
+export async function deleteProblemFromDb(id: string) {
+  const store = await getStore("readwrite");
+  await requestToPromise(store.delete(id));
 }
 
 export async function putProblemsToDb(problems: Problem[]) {

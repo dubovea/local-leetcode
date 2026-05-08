@@ -19,21 +19,22 @@ export function TopBar({
   theme: AppTheme;
 }) {
   const ThemeIcon = theme === "dark" ? Sun : Moon;
-  const themeTitle = theme === "dark" ? "Switch to light theme" : "Switch to dark theme";
+  const themeTitle = theme === "dark" ? "Включить светлую тему" : "Включить тёмную тему";
 
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-topbar)] px-4">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-[#f5b935] text-sm font-black text-black">
-          L
+          M
         </div>
+        <div className="text-[15px] font-semibold text-[var(--lc-text-strong)]">MedikCode</div>
         <button
           className="flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-[15px] font-semibold text-[var(--lc-text-strong)] transition-colors hover:bg-[var(--lc-hover)]"
           type="button"
           onClick={onOpenProblemList}
         >
           <List className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
-          <span className="truncate">Problem List</span>
+          <span className="truncate">Задачи</span>
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--lc-muted)]" />
         </button>
       </div>

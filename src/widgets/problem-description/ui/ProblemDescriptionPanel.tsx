@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { Eye, FileText, Pencil, ScrollText } from "lucide-react";
-import type { Problem } from "@/entities/problem/model/types";
+import { BookOpen, CheckCircle2, Eye, FileText, Pencil, ScrollText } from "lucide-react";
+import type { Problem, ProblemListItem } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
 import { MarkdownView } from "@/shared/ui/MarkdownView";
 import { Button } from "@/shared/ui/button";
 import { Textarea } from "@/shared/ui/textarea";
 import { cn } from "@/shared/lib/cn";
 import { SolutionsHistory } from "@/features/solutions-history/ui/SolutionsHistory";
+import { PatternGuide } from "@/features/pattern-guide/ui/PatternGuide";
 
-type Tab = "description" | "solutions";
+type Tab = "description" | "solutions" | "patterns";
 
 function normalizeTopics(topics?: string[]) {
   return Array.from(new Set((topics ?? []).map((topic) => topic.trim()).filter(Boolean)));
@@ -39,12 +40,16 @@ function withoutLeadingTitle(markdown: string) {
 
 export function ProblemDescriptionPanel({
   problem,
+  problemIndex,
   onChange,
+  onSelectProblem,
   onRestoreSubmission,
   onDeleteSubmission,
 }: {
   problem: Problem;
+  problemIndex: ProblemListItem[];
   onChange: (problem: Problem) => void;
+  onSelectProblem: (problemId: string) => void;
   onRestoreSubmission: (submissionId: string) => void;
   onDeleteSubmission: (submissionId: string) => void;
 }) {
@@ -58,7 +63,13 @@ export function ProblemDescriptionPanel({
       ? withoutTopicsSection(problem.descriptionMarkdown)
       : problem.descriptionMarkdown,
   );
+  const solved = problem.submissions.some((submission) => submission.status === "accepted");
   const EditIcon = editingMarkdown ? Eye : Pencil;
+
+  function openLinkedProblem(problemId: string) {
+    setTab("description");
+    onSelectProblem(problemId);
+  }
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
@@ -74,7 +85,7 @@ export function ProblemDescriptionPanel({
           onClick={() => setTab("description")}
         >
           <FileText className="h-4 w-4" />
-          Description
+          Описание
         </button>
         <button
           className={cn(
@@ -87,8 +98,27 @@ export function ProblemDescriptionPanel({
           onClick={() => setTab("solutions")}
         >
           <ScrollText className="h-4 w-4" />
-          Solutions
+          Решения
         </button>
+        <button
+          className={cn(
+            "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+            tab === "patterns"
+              ? "bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
+              : "text-[var(--lc-muted)] hover:bg-[var(--lc-hover)]",
+          )}
+          type="button"
+          onClick={() => setTab("patterns")}
+        >
+          <BookOpen className="h-4 w-4" />
+          Паттерны
+        </button>
+        {solved ? (
+          <div className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[var(--lc-success)]">
+            <CheckCircle2 className="h-4 w-4" />
+            Решено
+          </div>
+        ) : null}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto p-5">
@@ -141,12 +171,14 @@ export function ProblemDescriptionPanel({
               />
             </div>
           </div>
-        ) : (
+        ) : tab === "solutions" ? (
           <SolutionsHistory
             submissions={problem.submissions}
             onRestore={onRestoreSubmission}
             onDelete={onDeleteSubmission}
           />
+        ) : (
+          <PatternGuide problems={problemIndex} onSelectProblem={openLinkedProblem} />
         )}
       </div>
     </section>

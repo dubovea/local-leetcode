@@ -39,7 +39,7 @@ export function SolutionEditor({
   }, [onRun]);
 
   useEffect(() => {
-    monacoRef.current?.editor.setTheme(theme === "dark" ? "leetcode-dark" : "leetcode-light");
+    monacoRef.current?.editor.setTheme(theme === "dark" ? "medikcode-dark" : "medikcode-light");
   }, [theme]);
 
   useEffect(() => {
@@ -140,7 +140,7 @@ export function SolutionEditor({
   const handleMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
-    monaco.editor.defineTheme("leetcode-dark", {
+    monaco.editor.defineTheme("medikcode-dark", {
       base: "vs-dark",
       inherit: true,
       rules: [],
@@ -151,7 +151,7 @@ export function SolutionEditor({
         "editor.selectionBackground": "#3a3d41",
       },
     });
-    monaco.editor.defineTheme("leetcode-light", {
+    monaco.editor.defineTheme("medikcode-light", {
       base: "vs",
       inherit: true,
       rules: [],
@@ -162,7 +162,7 @@ export function SolutionEditor({
         "editor.selectionBackground": "#dbeafe",
       },
     });
-    monaco.editor.setTheme(theme === "dark" ? "leetcode-dark" : "leetcode-light");
+    monaco.editor.setTheme(theme === "dark" ? "medikcode-dark" : "medikcode-light");
 
     monaco.languages.registerDocumentFormattingEditProvider("javascript", {
       async provideDocumentFormattingEdits(model: Monaco.editor.ITextModel) {

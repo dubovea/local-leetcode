@@ -1,8 +1,10 @@
 import { create } from "zustand";
 import { defaultProblems } from "./defaultProblems";
 import { generatedNeenzaProblems } from "./generatedNeenzaProblems";
+import { generatedPatternProblems } from "./generatedPatternProblems";
 import {
   clearProblemsDb,
+  deleteProblemFromDb,
   getAllProblemsFromDb,
   getProblemFromDb,
   getProblemIndexFromDb,
@@ -14,18 +16,34 @@ import {
 } from "./problemDb";
 import type { Problem, ProblemListItem, ProblemsBackup, Submission } from "./types";
 
-const SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
+const LEGACY_SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
+const SELECTED_PROBLEM_KEY = "medikcode:v1:selected-problem-id";
+const PATTERN_SEED_KEY = "medikcode:v1:pattern-problems-seeded";
 
 function getSeedProblems() {
-  return [...generatedNeenzaProblems, ...defaultProblems];
+  return [...generatedPatternProblems, ...generatedNeenzaProblems, ...defaultProblems];
 }
 
 function readSelectedProblemId() {
-  return localStorage.getItem(SELECTED_PROBLEM_KEY);
+  return (
+    localStorage.getItem(SELECTED_PROBLEM_KEY) ?? localStorage.getItem(LEGACY_SELECTED_PROBLEM_KEY)
+  );
 }
 
 function saveSelectedProblemId(problemId: string) {
   localStorage.setItem(SELECTED_PROBLEM_KEY, problemId);
+}
+
+function clearSelectedProblemId() {
+  localStorage.removeItem(SELECTED_PROBLEM_KEY);
+}
+
+function patternSeedImported() {
+  return localStorage.getItem(PATTERN_SEED_KEY) === "true";
+}
+
+function markPatternSeedImported() {
+  localStorage.setItem(PATTERN_SEED_KEY, "true");
 }
 
 function normalizeProblem(problem: Problem): Problem {
@@ -76,6 +94,7 @@ type ProblemStore = {
   saveProblemCode: (problemId: string, code: string) => Promise<void>;
   addSubmission: (problemId: string, submission: Submission, code: string) => Promise<void>;
   deleteSubmission: (problemId: string, submissionId: string) => Promise<void>;
+  deleteProblem: (problemId: string) => Promise<void>;
   restoreSubmissionCode: (problemId: string, submissionId: string) => Promise<string | null>;
   addManualProblem: (problem: Problem) => Promise<void>;
   importProblems: (problems: Problem[]) => Promise<void>;
@@ -97,9 +116,25 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
       if (!hasStoredProblems) {
         await putProblemsToDb(getSeedProblems().map(normalizeProblem));
+        markPatternSeedImported();
       }
 
-      const index = await getProblemIndexFromDb();
+      let index = await getProblemIndexFromDb();
+
+      if (hasStoredProblems && !patternSeedImported()) {
+        const existingProblemIds = new Set(index.map((item) => item.id));
+        const missingPatternProblems = generatedPatternProblems.filter(
+          (problem) => !existingProblemIds.has(problem.id),
+        );
+
+        if (missingPatternProblems.length > 0) {
+          await putProblemsToDb(missingPatternProblems.map(normalizeProblem));
+          index = await getProblemIndexFromDb();
+        }
+
+        markPatternSeedImported();
+      }
+
       const selectedProblemId = readSelectedProblemId();
       const activeProblemId = index.some((item) => item.id === selectedProblemId)
         ? selectedProblemId
@@ -209,6 +244,40 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }));
   },
 
+  async deleteProblem(problemId) {
+    const currentIndex = get().problemIndex;
+    const problemPosition = currentIndex.findIndex((item) => item.id === problemId);
+
+    if (problemPosition === -1) {
+      return;
+    }
+
+    await deleteProblemFromDb(problemId);
+
+    const nextIndex = currentIndex.filter((item) => item.id !== problemId);
+    const deletedActiveProblem = get().activeProblemId === problemId;
+
+    if (!deletedActiveProblem) {
+      set({ problemIndex: nextIndex });
+      return;
+    }
+
+    const nextItem = nextIndex[Math.min(problemPosition, nextIndex.length - 1)] ?? null;
+    const nextProblem = nextItem ? await getProblemFromDb(nextItem.id) : null;
+
+    if (nextProblem) {
+      saveSelectedProblemId(nextProblem.id);
+    } else {
+      clearSelectedProblemId();
+    }
+
+    set({
+      activeProblem: nextProblem ? normalizeProblem(nextProblem) : null,
+      activeProblemId: nextProblem?.id ?? null,
+      problemIndex: nextIndex,
+    });
+  },
+
   async restoreSubmissionCode(problemId, submissionId) {
     const problem = await getProblemFromDb(problemId);
     const submission = problem
@@ -304,6 +373,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
   async resetProblems() {
     await clearProblemsDb();
     await putProblemsToDb(getSeedProblems().map(normalizeProblem));
+    markPatternSeedImported();
 
     const index = await getProblemIndexFromDb();
     const activeProblem = index[0] ? await getProblemFromDb(index[0].id) : null;
