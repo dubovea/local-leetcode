@@ -174,6 +174,34 @@ export function ProblemPage() {
     setDrawerOpen(false);
   }
 
+  const handleDescriptionChange = useCallback(
+    (problem: Problem) => {
+      void handleProblemChange(problem);
+    },
+    [handleProblemChange],
+  );
+
+  const handleDescriptionSelectProblem = useCallback(
+    (problemId: string) => {
+      void handleSelectProblem(problemId);
+    },
+    [handleSelectProblem],
+  );
+
+  const handleDescriptionRestoreSubmission = useCallback(
+    (submissionId: string) => {
+      void handleRestoreSubmission(submissionId);
+    },
+    [handleRestoreSubmission],
+  );
+
+  const handleDescriptionDeleteSubmission = useCallback(
+    (submissionId: string) => {
+      void handleDeleteSubmission(submissionId);
+    },
+    [handleDeleteSubmission],
+  );
+
   if (!hydrated) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--lc-page)] text-sm text-[var(--lc-muted)]">
@@ -226,10 +254,10 @@ export function ProblemPage() {
         <ProblemDescriptionPanel
           problem={activeProblem}
           problemIndex={problemIndex}
-          onChange={(problem) => void handleProblemChange(problem)}
-          onSelectProblem={(problemId) => void handleSelectProblem(problemId)}
-          onRestoreSubmission={(submissionId) => void handleRestoreSubmission(submissionId)}
-          onDeleteSubmission={(submissionId) => void handleDeleteSubmission(submissionId)}
+          onChange={handleDescriptionChange}
+          onSelectProblem={handleDescriptionSelectProblem}
+          onRestoreSubmission={handleDescriptionRestoreSubmission}
+          onDeleteSubmission={handleDescriptionDeleteSubmission}
         />
         <CodeWorkspace
           activeCaseId={activeCaseId}

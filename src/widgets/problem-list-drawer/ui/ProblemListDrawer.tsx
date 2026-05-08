@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { useInView } from "react-intersection-observer";
 import {
   CheckCircle2,
   ChevronDown,
@@ -11,36 +12,38 @@ import {
   Search,
   Tags,
   Trash2,
-  X,
 } from "lucide-react";
+
 import type {
   Difficulty,
   Problem,
   ProblemListItem,
   ProblemsBackup,
 } from "@/entities/problem/model/types";
+
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
-import { cn } from "@/shared/lib/cn";
+import { cn } from "@/shared/lib/utils";
+
 import { Button } from "@/shared/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/shared/ui/collapsible";
 import { Input } from "@/shared/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select";
+import { ScrollArea } from "@/shared/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/shared/ui/sheet";
+
 import { ImportProblemsButton } from "@/features/import-problems/ui/ImportProblemsButton";
 import { CreateManualProblemForm } from "@/features/manual-problem/ui/CreateManualProblemForm";
 import { BackupButtons } from "@/features/backup-problems/ui/BackupButtons";
 
 type StatusFilter = "all" | "solved" | "unsolved";
 type DifficultyFilter = "all" | Difficulty;
+
 type FilterOption<T extends string = string> = {
   value: T;
   label: string;
 };
+
+const PAGE_SIZE = 35;
 
 const difficultyOptions: FilterOption<DifficultyFilter>[] = [
   { value: "all", label: "Любая сложность" },
@@ -54,6 +57,73 @@ const statusFilterTitle: Record<StatusFilter, string> = {
   solved: "Показать решённые задачи",
   unsolved: "Показать нерешённые задачи",
 };
+
+function getScrollAreaViewport(root: HTMLDivElement | null) {
+  return root?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]") ?? null;
+}
+
+function usePagedItems<T>(items: T[], pageSize = PAGE_SIZE) {
+  const [limit, setLimit] = useState(pageSize);
+
+  useEffect(() => {
+    setLimit(pageSize);
+  }, [items, pageSize]);
+
+  const visibleItems = useMemo(() => {
+    return items.slice(0, limit);
+  }, [items, limit]);
+
+  const hasMore = limit < items.length;
+
+  const loadMore = useCallback(() => {
+    setLimit((currentLimit) => Math.min(currentLimit + pageSize, items.length));
+  }, [items.length, pageSize]);
+
+  return {
+    visibleItems,
+    visibleCount: visibleItems.length,
+    totalCount: items.length,
+    hasMore,
+    loadMore,
+  };
+}
+
+function LoadMoreTrigger({
+  hasMore,
+  visibleCount,
+  totalCount,
+  root,
+  onLoadMore,
+}: {
+  hasMore: boolean;
+  visibleCount: number;
+  totalCount: number;
+  root: HTMLElement | null;
+  onLoadMore: () => void;
+}) {
+  const { ref, inView } = useInView({
+    root,
+    rootMargin: "320px 0px",
+    threshold: 0,
+    skip: !hasMore,
+  });
+
+  useEffect(() => {
+    if (inView && hasMore) {
+      onLoadMore();
+    }
+  }, [inView, hasMore, onLoadMore]);
+
+  if (!hasMore) {
+    return null;
+  }
+
+  return (
+    <div ref={ref} className="py-3 text-center text-xs text-(--lc-muted)">
+      Показано {visibleCount} из {totalCount}. Загружаем ещё...
+    </div>
+  );
+}
 
 function Section({
   title,
@@ -71,17 +141,19 @@ function Section({
   const ChevronIcon = open ? ChevronDown : ChevronRight;
 
   return (
-    <Collapsible className="mb-4" open={open} onOpenChange={onOpenChange}>
+    <Collapsible open={open} onOpenChange={onOpenChange}>
       <div className="sticky top-0 z-10 flex items-center justify-between bg-[var(--lc-page)] px-2 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--lc-muted)]">
         <CollapsibleTrigger className="flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:bg-[var(--lc-hover)]">
           <ChevronIcon className="h-4 w-4 shrink-0" />
           <span className="truncate">{title}</span>
         </CollapsibleTrigger>
+
         <span className="ml-2 rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-[11px] text-[var(--lc-muted)]">
           {count}
         </span>
       </div>
-      <CollapsibleContent>{children}</CollapsibleContent>
+
+      <CollapsibleContent>{open ? children : null}</CollapsibleContent>
     </Collapsible>
   );
 }
@@ -135,15 +207,18 @@ function FilterSelect<T extends string>({
     <Select value={value} onValueChange={(nextValue) => onValueChange(nextValue as T)}>
       <SelectTrigger
         aria-label={label}
-        className="h-9 w-full justify-between rounded-lg border-[var(--lc-border)] bg-[var(--lc-panel)] text-[var(--lc-text-strong)]"
+        className="h-9 w-full min-w-0 justify-between gap-2 overflow-hidden rounded-lg border-(--lc-border) bg-(--lc-panel) text-(--lc-text-strong)"
         title={label}
       >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="shrink-0 text-[var(--lc-subtle)]">{icon}</span>
-          <SelectValue />
+        <span className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+          <span className="shrink-0 text-(--lc-subtle)">{icon}</span>
+
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left">
+            <SelectValue />
+          </span>
         </span>
       </SelectTrigger>
-      <SelectContent className={cn("bg-[var(--lc-panel-raised)]", contentClassName)}>
+      <SelectContent className={cn("bg-(--lc-panel-raised)", contentClassName)}>
         {options.map((option) => (
           <SelectItem key={option.value} value={option.value}>
             {option.label}
@@ -154,7 +229,7 @@ function FilterSelect<T extends string>({
   );
 }
 
-function ProblemRow({
+const ProblemRow = memo(function ProblemRow({
   item,
   activeProblemId,
   onSelect,
@@ -186,11 +261,14 @@ function ProblemRow({
             item.solved ? "text-[var(--lc-success)]" : "text-[var(--lc-subtle)]",
           )}
         />
+
         <span className="truncate font-medium text-[var(--lc-text-strong)]">
           {item.number}. {item.title}
         </span>
+
         <DifficultyBadge difficulty={item.difficulty} />
       </button>
+
       <Button
         aria-label={`Удалить задачу ${item.title}`}
         className="mr-1 h-7 w-7 border border-[var(--lc-danger-border)] bg-[var(--lc-danger-bg)] text-[var(--lc-danger-text)] opacity-90 hover:bg-[var(--lc-danger-soft)] hover:text-[var(--lc-danger-text)] hover:opacity-100 focus-visible:opacity-100"
@@ -203,7 +281,7 @@ function ProblemRow({
       </Button>
     </div>
   );
-}
+});
 
 function applyStatusFilter(items: ProblemListItem[], statusFilter: StatusFilter) {
   if (statusFilter === "solved") {
@@ -258,33 +336,45 @@ export function ProblemListDrawer({
   onImportBackup: (backup: ProblemsBackup | Problem[]) => Promise<void>;
   onDeleteProblem: (problemId: string) => void;
 }) {
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+
+  const [scrollRoot, setScrollRoot] = useState<HTMLElement | null>(null);
+
   const [query, setQuery] = useState("");
+  const deferredQuery = useDeferredValue(query);
+
   const [creatingManual, setCreatingManual] = useState(false);
   const [importStatus, setImportStatus] = useState("");
+
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all");
   const [selectedTopic, setSelectedTopic] = useState("all");
+
   const [catalogOpen, setCatalogOpen] = useState(true);
   const [manualOpen, setManualOpen] = useState(true);
 
-  const topics = useMemo(
-    () =>
-      Array.from(new Set(problemIndex.flatMap((problem) => problem.topics ?? []))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
-    [problemIndex],
-  );
-  const topicOptions = useMemo<FilterOption[]>(
-    () => [
+  const handleScrollAreaRef = useCallback((node: HTMLDivElement | null) => {
+    scrollAreaRef.current = node;
+    setScrollRoot(getScrollAreaViewport(node));
+  }, []);
+
+  const topics = useMemo(() => {
+    return Array.from(new Set(problemIndex.flatMap((problem) => problem.topics ?? []))).sort(
+      (a, b) => a.localeCompare(b),
+    );
+  }, [problemIndex]);
+
+  const topicOptions = useMemo<FilterOption[]>(() => {
+    return [
       { value: "all", label: "Все темы" },
       ...topics.map((topic) => ({ value: topic, label: topic })),
-    ],
-    [topics],
-  );
-  const solvedCount = useMemo(
-    () => problemIndex.filter((problem) => problem.solved).length,
-    [problemIndex],
-  );
+    ];
+  }, [topics]);
+
+  const solvedCount = useMemo(() => {
+    return problemIndex.filter((problem) => problem.solved).length;
+  }, [problemIndex]);
+
   const nextManualNumber = useMemo(() => {
     const manualNumbers = problemIndex
       .filter((problem) => problem.source === "manual")
@@ -293,8 +383,15 @@ export function ProblemListDrawer({
     return Math.max(0, ...manualNumbers) + 1;
   }, [problemIndex]);
 
+  const hasActiveFilters =
+    deferredQuery.trim() !== "" ||
+    statusFilter !== "all" ||
+    difficultyFilter !== "all" ||
+    selectedTopic !== "all";
+
   const filteredIndex = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
+    const normalizedQuery = deferredQuery.trim().toLowerCase();
+
     const queryResult = normalizedQuery
       ? problemIndex.filter((item) => {
           return (
@@ -313,67 +410,94 @@ export function ProblemListDrawer({
       catalog: topicResult.filter((item) => item.source !== "manual"),
       manual: topicResult.filter((item) => item.source === "manual"),
     };
-  }, [difficultyFilter, problemIndex, query, selectedTopic, statusFilter]);
+  }, [deferredQuery, difficultyFilter, problemIndex, selectedTopic, statusFilter]);
 
-  function resetProblems() {
+  const catalogPage = usePagedItems(filteredIndex.catalog);
+  const manualPage = usePagedItems(filteredIndex.manual);
+
+  useEffect(() => {
+    scrollRoot?.scrollTo({ top: 0 });
+  }, [scrollRoot, deferredQuery, statusFilter, difficultyFilter, selectedTopic]);
+
+  const resetProblems = useCallback(() => {
     const confirmed = window.confirm(
       "Удалить все импортированные и свои задачи? Встроенные задачи MedikCode будут восстановлены.",
     );
 
-    if (confirmed) {
-      setCreatingManual(false);
-      setImportStatus("");
-      onResetProblems();
+    if (!confirmed) {
+      return;
     }
-  }
 
-  function deleteProblem(item: ProblemListItem) {
-    const confirmed = window.confirm(
-      `Удалить "${item.title}"? Будут удалены код, заметки, тесты и история решений.`,
-    );
+    setCreatingManual(false);
+    setImportStatus("");
+    onResetProblems();
+  }, [onResetProblems]);
 
-    if (confirmed) {
+  const deleteProblem = useCallback(
+    (item: ProblemListItem) => {
+      const confirmed = window.confirm(
+        `Удалить "${item.title}"? Будут удалены код, заметки, тесты и история решений.`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
       setCreatingManual(false);
       setImportStatus("");
       onDeleteProblem(item.id);
-    }
-  }
+    },
+    [onDeleteProblem],
+  );
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  const catalogEmptyText = hasActiveFilters
+    ? "Ничего не найдено по выбранным фильтрам."
+    : "Импортируйте JSON, чтобы добавить задачи.";
+
+  const manualEmptyText = hasActiveFilters
+    ? "Своих задач по выбранным фильтрам нет."
+    : "Свои задачи появятся здесь.";
 
   return (
-    <div className={cn("fixed inset-0 z-50 transition", open ? "visible" : "invisible")}>
-      <div
-        className={cn(
-          "absolute inset-0 bg-[var(--lc-backdrop)] transition-opacity",
-          open ? "opacity-100" : "opacity-0",
-        )}
-        onClick={onClose}
-      />
-
-      <aside
-        className={cn(
-          "absolute left-0 top-0 flex h-full w-[410px] flex-col border-r border-[var(--lc-border)] bg-[var(--lc-page)] shadow-2xl transition-transform duration-200",
-          open ? "translate-x-0" : "-translate-x-full",
-        )}
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetContent
+        side="left"
+        className="flex h-full w-[410px] max-w-[calc(100vw-24px)] flex-col border-r border-[var(--lc-border)] bg-[var(--lc-page)] p-0 shadow-2xl sm:max-w-none"
       >
-        <div className="flex h-14 items-center justify-between border-b border-[var(--lc-border)] px-4">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold text-[var(--lc-text-strong)]">Задачи</h2>
-            <span className="rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-xs text-[var(--lc-muted)]">
+        <SheetHeader className="flex h-14 shrink-0 flex-row items-center justify-between border-b border-[var(--lc-border)] px-4 pr-12">
+          <div className="flex min-w-0 items-center gap-3">
+            <SheetTitle className="text-lg font-semibold text-[var(--lc-text-strong)]">
+              Задачи
+            </SheetTitle>
+
+            <span className="shrink-0 rounded-full bg-[var(--lc-hover)] px-2 py-0.5 text-xs text-[var(--lc-muted)]">
               {solvedCount}/{problemIndex.length} Решено
             </span>
           </div>
-          <Button aria-label="Закрыть список задач" size="icon" variant="ghost" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
 
-        <div className="border-b border-[var(--lc-border)] p-4">
+          <SheetDescription className="sr-only">
+            Список задач, фильтры, импорт, экспорт и создание своих задач.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="shrink-0 border-b border-[var(--lc-border)] p-4">
           <div className="mb-3 flex items-center gap-2">
             <Button className="flex-1" variant="secondary" onClick={() => setCreatingManual(true)}>
               <Plus className="h-4 w-4" />
               Своя задача
             </Button>
+
             <ImportProblemsButton onImport={onImportProblems} onStatusChange={setImportStatus} />
+
             <BackupButtons
               onExport={onExportBackup}
               onImport={onImportBackup}
@@ -402,6 +526,7 @@ export function ProblemListDrawer({
           <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--lc-subtle)]" />
+
               <Input
                 className="rounded-full pl-9"
                 placeholder="Поиск задач"
@@ -418,6 +543,7 @@ export function ProblemListDrawer({
               >
                 <ListFilter className="h-4 w-4" />
               </FilterButton>
+
               <FilterButton
                 active={statusFilter === "unsolved"}
                 title={statusFilterTitle.unsolved}
@@ -425,6 +551,7 @@ export function ProblemListDrawer({
               >
                 <Circle className="h-4 w-4" />
               </FilterButton>
+
               <FilterButton
                 active={statusFilter === "solved"}
                 title={statusFilterTitle.solved}
@@ -443,6 +570,7 @@ export function ProblemListDrawer({
               value={difficultyFilter}
               onValueChange={setDifficultyFilter}
             />
+
             {topics.length > 0 ? (
               <FilterSelect
                 contentClassName="min-w-64"
@@ -456,54 +584,72 @@ export function ProblemListDrawer({
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-2">
-          <Section
-            count={filteredIndex.catalog.length}
-            open={catalogOpen}
-            title="Каталог задач"
-            onOpenChange={setCatalogOpen}
-          >
-            {filteredIndex.catalog.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">
-                Импортируйте JSON, чтобы добавить задачи.
-              </div>
-            ) : (
-              filteredIndex.catalog.map((item) => (
-                <ProblemRow
-                  key={item.id}
-                  activeProblemId={activeProblemId}
-                  item={item}
-                  onSelect={onSelect}
-                  onDelete={deleteProblem}
-                />
-              ))
-            )}
-          </Section>
+        <ScrollArea ref={handleScrollAreaRef} className="min-h-0 flex-1">
+          <div className="p-2">
+            <Section
+              count={filteredIndex.catalog.length}
+              open={catalogOpen}
+              title="Каталог задач"
+              onOpenChange={setCatalogOpen}
+            >
+              {filteredIndex.catalog.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">{catalogEmptyText}</div>
+              ) : (
+                <>
+                  {catalogPage.visibleItems.map((item) => (
+                    <ProblemRow
+                      key={item.id}
+                      activeProblemId={activeProblemId}
+                      item={item}
+                      onSelect={onSelect}
+                      onDelete={deleteProblem}
+                    />
+                  ))}
 
-          <Section
-            count={filteredIndex.manual.length}
-            open={manualOpen}
-            title="Свои задачи"
-            onOpenChange={setManualOpen}
-          >
-            {filteredIndex.manual.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">
-                Свои задачи появятся здесь.
-              </div>
-            ) : (
-              filteredIndex.manual.map((item) => (
-                <ProblemRow
-                  key={item.id}
-                  activeProblemId={activeProblemId}
-                  item={item}
-                  onSelect={onSelect}
-                  onDelete={deleteProblem}
-                />
-              ))
-            )}
-          </Section>
-        </div>
-      </aside>
-    </div>
+                  <LoadMoreTrigger
+                    hasMore={catalogPage.hasMore}
+                    root={scrollRoot}
+                    totalCount={catalogPage.totalCount}
+                    visibleCount={catalogPage.visibleCount}
+                    onLoadMore={catalogPage.loadMore}
+                  />
+                </>
+              )}
+            </Section>
+
+            <Section
+              count={filteredIndex.manual.length}
+              open={manualOpen}
+              title="Свои задачи"
+              onOpenChange={setManualOpen}
+            >
+              {filteredIndex.manual.length === 0 ? (
+                <div className="px-3 py-4 text-sm text-[var(--lc-subtle)]">{manualEmptyText}</div>
+              ) : (
+                <>
+                  {manualPage.visibleItems.map((item) => (
+                    <ProblemRow
+                      key={item.id}
+                      activeProblemId={activeProblemId}
+                      item={item}
+                      onSelect={onSelect}
+                      onDelete={deleteProblem}
+                    />
+                  ))}
+
+                  <LoadMoreTrigger
+                    hasMore={manualPage.hasMore}
+                    root={scrollRoot}
+                    totalCount={manualPage.totalCount}
+                    visibleCount={manualPage.visibleCount}
+                    onLoadMore={manualPage.loadMore}
+                  />
+                </>
+              )}
+            </Section>
+          </div>
+        </ScrollArea>
+      </SheetContent>
+    </Sheet>
   );
 }

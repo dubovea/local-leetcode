@@ -889,8 +889,9 @@ export function PatternGuide({
           Гайд MedikCode по паттернам
         </div>
         <p className="mb-3 text-sm leading-6 text-[var(--lc-muted)]">
-          Короткая локальная шпаргалка для выбора подхода перед кодом. Чипы задач открывают
-          подходящие задачи из встроенного набора, собранного из merged_problems.json.
+          Документация по основным паттернам решения алгоритмических задач. Кратко объясняет, когда
+          применять каждый подход, какие признаки искать в условии и на какие встроенные задачи
+          можно опереться для практики.
         </p>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-md border border-[var(--lc-border)] px-2 py-1 text-[var(--lc-muted)]">
