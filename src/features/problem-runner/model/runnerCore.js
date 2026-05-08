@@ -8,6 +8,101 @@ function nowMs() {
   return Date.now();
 }
 
+async function readMemoryBytes() {
+  const measureUserAgentSpecificMemory =
+    typeof performance !== "undefined" &&
+    performance &&
+    typeof performance.measureUserAgentSpecificMemory === "function"
+      ? performance.measureUserAgentSpecificMemory.bind(performance)
+      : undefined;
+
+  if (measureUserAgentSpecificMemory) {
+    try {
+      const sample = await measureUserAgentSpecificMemory();
+
+      if (Number.isFinite(sample?.bytes)) {
+        return sample.bytes;
+      }
+    } catch {
+      // Fall back to lighter browser-specific heap counters below.
+    }
+  }
+
+  const memory =
+    typeof performance !== "undefined" && performance && "memory" in performance
+      ? performance.memory
+      : undefined;
+  const usedHeapSize = memory?.usedJSHeapSize;
+
+  return Number.isFinite(usedHeapSize) ? usedHeapSize : undefined;
+}
+
+function estimateValueMemoryBytes(value, seen = new Set()) {
+  if (value === null || typeof value === "undefined") {
+    return 0;
+  }
+
+  if (typeof value === "string") {
+    return value.length * 2;
+  }
+
+  if (typeof value === "number" || typeof value === "bigint") {
+    return 8;
+  }
+
+  if (typeof value === "boolean") {
+    return 4;
+  }
+
+  if (typeof value !== "object") {
+    return 0;
+  }
+
+  if (seen.has(value)) {
+    return 0;
+  }
+
+  seen.add(value);
+
+  if (value instanceof ArrayBuffer) {
+    return value.byteLength;
+  }
+
+  if (ArrayBuffer.isView(value)) {
+    return value.byteLength;
+  }
+
+  if (Array.isArray(value)) {
+    return value.reduce(
+      (total, item) => total + estimateValueMemoryBytes(item, seen),
+      24 + value.length * 8,
+    );
+  }
+
+  return Object.entries(value).reduce(
+    (total, [key, item]) => total + key.length * 2 + estimateValueMemoryBytes(item, seen),
+    32,
+  );
+}
+
+async function measureMemoryBytes(startHeapBytes, output) {
+  const finishHeapBytes = await readMemoryBytes();
+  const heapDelta =
+    typeof startHeapBytes === "number" && typeof finishHeapBytes === "number"
+      ? Math.max(0, finishHeapBytes - startHeapBytes)
+      : 0;
+
+  return Math.max(heapDelta, estimateValueMemoryBytes(output));
+}
+
+function maxCaseMemoryBytes(cases) {
+  const values = cases
+    .map((testCase) => testCase.memoryBytes)
+    .filter((memoryBytes) => Number.isFinite(memoryBytes));
+
+  return values.length > 0 ? Math.max(...values) : undefined;
+}
+
 function cleanInputText(text) {
   return String(text ?? "")
     .trim()
@@ -279,29 +374,39 @@ export async function runUserCode(request) {
 
   for (let index = 0; index < request.testCases.length; index += 1) {
     const testCase = request.testCases[index];
-    const caseStartedAt = nowMs();
+    let durationMs = 0;
+    let solutionStartedAt;
 
     try {
       const parsedInput = parseInputAssignments(testCase.input);
       const expected = evaluateLiteral(testCase.expected);
+      const memoryStartedBytes = await readMemoryBytes();
+      solutionStartedAt = nowMs();
       const output = await solution(...parsedInput.values);
+      durationMs = nowMs() - solutionStartedAt;
+      const memoryBytes = await measureMemoryBytes(memoryStartedBytes, output);
       const passed = compareValues(output, expected, request.judgeMode);
 
       cases.push({
         id: testCase.id,
         name: `Case ${index + 1}`,
         passed,
-        durationMs: nowMs() - caseStartedAt,
+        durationMs,
+        memoryBytes,
         inputText: testCase.input,
         outputText: stringifyValue(output),
         expectedText: stringifyValue(expected),
       });
     } catch (error) {
+      if (typeof solutionStartedAt === "number") {
+        durationMs = nowMs() - solutionStartedAt;
+      }
+
       cases.push({
         id: testCase.id,
         name: `Case ${index + 1}`,
         passed: false,
-        durationMs: nowMs() - caseStartedAt,
+        durationMs,
         inputText: testCase.input,
         outputText: "",
         expectedText: cleanValueText(testCase.expected),
@@ -317,7 +422,8 @@ export async function runUserCode(request) {
   return {
     ok,
     status: ok ? "accepted" : hasRuntimeError ? "runtime-error" : "wrong-answer",
-    durationMs: nowMs() - totalStartedAt,
+    durationMs: cases.reduce((total, testCase) => total + testCase.durationMs, 0),
+    memoryBytes: ok ? maxCaseMemoryBytes(cases) : undefined,
     passedCount,
     totalCount: request.testCases.length,
     cases,

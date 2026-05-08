@@ -34,6 +34,7 @@ function resultToSubmission(result: RunResult, code: string): Submission {
     submittedAt: new Date().toISOString(),
     status,
     runtimeMs: result.durationMs,
+    memoryBytes: status === "accepted" ? result.memoryBytes : undefined,
     code,
     cases: result.cases,
     logs: result.logs,

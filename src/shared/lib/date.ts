@@ -20,3 +20,21 @@ export function formatRuntime(ms: number) {
 
   return `${Math.round(ms)} ms`;
 }
+
+export function formatMemory(bytes?: number) {
+  if (!Number.isFinite(bytes)) {
+    return "N/A";
+  }
+
+  const value = bytes ?? 0;
+
+  if (value < 1024) {
+    return `${Math.round(value)} B`;
+  }
+
+  if (value < 1024 * 1024) {
+    return `${(value / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}

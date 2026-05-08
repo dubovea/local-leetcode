@@ -28,6 +28,7 @@ export type CaseRunResult = {
   name: string;
   passed: boolean;
   durationMs: number;
+  memoryBytes?: number;
   inputText: string;
   outputText: string;
   expectedText: string;
@@ -38,6 +39,7 @@ export type RunResult = {
   ok: boolean;
   status: RunStatus;
   durationMs: number;
+  memoryBytes?: number;
   passedCount: number;
   totalCount: number;
   cases: CaseRunResult[];
@@ -50,6 +52,7 @@ export type Submission = {
   submittedAt: string;
   status: Exclude<RunStatus, "idle" | "running">;
   runtimeMs: number;
+  memoryBytes?: number;
   code: string;
   cases: CaseRunResult[];
   logs: ConsoleLog[];

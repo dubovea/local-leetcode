@@ -52,6 +52,14 @@ const accepted = await runUserCode({
 
 assert(accepted.status === "accepted", `expected accepted, got ${accepted.status}`);
 assert(accepted.passedCount === 3, "expected all cases to pass");
+assert(
+  Math.abs(
+    accepted.durationMs -
+      accepted.cases.reduce((total, testCase) => total + testCase.durationMs, 0),
+  ) < 0.001,
+  "accepted runtime should be the sum of solution runtimes only",
+);
+assert(Number.isFinite(accepted.memoryBytes), "accepted result should include memory usage");
 
 const wrongAnswer = await runUserCode({
   code: "var groupAnagrams = function () { return []; };",
@@ -76,6 +84,103 @@ const runtimeError = await runUserCode({
 });
 
 assert(runtimeError.status === "runtime-error", `expected runtime-error, got ${runtimeError.status}`);
+
+const delayedRuntimeError = await runUserCode({
+  code: `var failSlow = function () {
+  const startedAt = performance.now();
+
+  while (performance.now() - startedAt < 5) {}
+
+  throw new Error("boom");
+};`,
+  functionName: "failSlow",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "undefined" }],
+});
+
+assert(
+  delayedRuntimeError.cases[0].durationMs > 0,
+  "runtime errors should keep measured solution runtime",
+);
+
+const smallMemory = await runUserCode({
+  code: "var memoryProbe = function () { return [1]; };",
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "[1]" }],
+});
+const largeOutput = Array.from({ length: 1000 }, (_, index) => index);
+const largeMemory = await runUserCode({
+  code: "var memoryProbe = function () { return Array.from({ length: 1000 }, (_, index) => index); };",
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: JSON.stringify(largeOutput) }],
+});
+
+assert(smallMemory.status === "accepted", "small memory probe should be accepted");
+assert(largeMemory.status === "accepted", "large memory probe should be accepted");
+assert(
+  largeMemory.memoryBytes > smallMemory.memoryBytes,
+  "memory usage should grow for larger retained output",
+);
+
+const originalMemoryDescriptor = Object.getOwnPropertyDescriptor(performance, "memory");
+
+Object.defineProperty(performance, "memory", {
+  configurable: true,
+  value: { usedJSHeapSize: 1000 },
+});
+
+const heapMeasuredMemory = await runUserCode({
+  code: `var memoryProbe = function () {
+  performance.memory.usedJSHeapSize += 4096;
+
+  return [1];
+};`,
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "[1]" }],
+});
+
+if (originalMemoryDescriptor) {
+  Object.defineProperty(performance, "memory", originalMemoryDescriptor);
+} else {
+  Reflect.deleteProperty(performance, "memory");
+}
+
+assert(
+  heapMeasuredMemory.memoryBytes >= 4096,
+  "memory usage should prefer measured heap delta when available",
+);
+
+const originalMeasureUserAgentSpecificMemory = performance.measureUserAgentSpecificMemory;
+const measuredSamples = [2000, 10192];
+
+Object.defineProperty(performance, "measureUserAgentSpecificMemory", {
+  configurable: true,
+  value: async () => ({ bytes: measuredSamples.shift() ?? 10192 }),
+});
+
+const userAgentMeasuredMemory = await runUserCode({
+  code: "var memoryProbe = function () { return [1]; };",
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "[1]" }],
+});
+
+if (originalMeasureUserAgentSpecificMemory) {
+  Object.defineProperty(performance, "measureUserAgentSpecificMemory", {
+    configurable: true,
+    value: originalMeasureUserAgentSpecificMemory,
+  });
+} else {
+  Reflect.deleteProperty(performance, "measureUserAgentSpecificMemory");
+}
+
+assert(
+  userAgentMeasuredMemory.memoryBytes >= 8192,
+  "memory usage should prefer measureUserAgentSpecificMemory when available",
+);
 
 console.log("Smoke tests passed");
 console.log(`Accepted runtime: ${accepted.durationMs.toFixed(3)} ms`);
