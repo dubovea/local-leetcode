@@ -4,7 +4,13 @@ export type ProblemSource = "leetcode" | "manual";
 
 export type JudgeMode = "exact" | "unordered-array";
 
-export type CodeLanguage = "javascript" | "python-pyodide" | "c-wasm" | "cpp-wasm" | "go-wasm";
+export type CodeLanguage =
+  | "javascript"
+  | "python-pyodide"
+  | "c-wasm"
+  | "csharp-wasm"
+  | "cpp-wasm"
+  | "go-wasm";
 
 export type ProblemCodeByLanguage = Partial<Record<CodeLanguage, string>>;
 
@@ -72,6 +78,7 @@ export type Problem = {
   slug: string;
   difficulty: Difficulty;
   topics?: string[];
+  hints?: string[];
   descriptionMarkdown: string;
   notesMarkdown?: string;
   functionName: string;
@@ -79,6 +86,7 @@ export type Problem = {
   activeLanguage?: CodeLanguage;
   code: string;
   codeByLanguage?: ProblemCodeByLanguage;
+  missingCodeLanguages?: CodeLanguage[];
   testCases: TestCase[];
   submissions: Submission[];
 };

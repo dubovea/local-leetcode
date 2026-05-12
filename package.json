@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "smoke": "node scripts/smoke-runner.mjs && node scripts/test-neenza-converter.mjs",
     "import:leetcode": "node scripts/import-leetcode-catalog.mjs",
+    "import:patterns": "node scripts/generate-pattern-problems.mjs",
     "format": "prettier --write .",
     "import:neenza": "node scripts/import-neenza-problems.mjs",
     "convert:neenza": "node scripts/import-neenza-problems.mjs"

@@ -1,7 +1,54 @@
+import {
+  CustomFunction,
+  Employee,
+  Iterator,
+  ListNode,
+  Master,
+  MountainArray,
+  Node,
+  NestedInteger,
+  TreeNode,
+  _Node,
+  arrayToBinaryTree,
+  arrayToEmployees,
+  arrayToGraph,
+  arrayToIterator,
+  arrayToLinkedList,
+  arrayToMountainArray,
+  arrayToNaryTree,
+  arrayToNestedInteger,
+  arrayToQuadTree,
+  arrayToRandomList,
+  binaryTreeToArray,
+  binaryTreeNextToArray,
+  graphToArray,
+  linkedListToArray,
+  naryTreeToArray,
+  nestedIntegerToValue,
+  quadTreeToArray,
+  randomListToArray,
+  valueToCustomFunction,
+  valuesToMaster,
+} from "./structures.js";
 const ASSIGNMENT_START_RE = /^[A-Za-z_$][\w$]*\s*=/;
 const DEFAULT_LANGUAGE = "javascript";
 const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.4/full/";
 const PYODIDE_MODULE_URL = `${PYODIDE_INDEX_URL}pyodide.mjs`;
+const PYTHON_PRELUDE = `
+from __future__ import annotations
+from typing import *
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val = val
+        self.next = next
+
+class TreeNode:
+    def __init__(self, val=0, left=None, right=None):
+        self.val = val
+        self.left = left
+        self.right = right
+`;
 
 let pyodidePromise;
 let pythonLogsTarget = null;
@@ -215,7 +262,9 @@ function findValueEnd(source, index) {
 }
 
 function evaluateLiteral(valueText) {
-  const cleanText = cleanValueText(valueText).replace(/,\s*$/, "");
+  const cleanText = cleanValueText(valueText)
+    .replace(/,\s*$/, "")
+    .replace(/(^|[\[,]\s*)#(?=\s*[,\]])/g, '$1"#"');
 
   if (!cleanText) {
     throw new Error("Expected a value, but got an empty string");
@@ -253,6 +302,218 @@ export function parseInputAssignments(inputText) {
   }
 
   return { names, values };
+}
+
+function normalizeTypeName(type) {
+  return String(type ?? "")
+    .replace(/\s+/g, "")
+    .replace(/^Array\.</, "")
+    .replace(/\bnull\b/g, "")
+    .replace(/>$/, "");
+}
+
+function hasType(type, target) {
+  return normalizeTypeName(type)
+    .split(/[|&]/)
+    .some((candidate) => candidate === target || candidate.includes(target));
+}
+
+function getStructuredKind(type, code) {
+  const normalizedType = normalizeTypeName(type);
+
+  if (hasType(normalizedType, "ListNode")) {
+    return "linked-list";
+  }
+
+  if (hasType(normalizedType, "TreeNode")) {
+    return "binary-tree";
+  }
+
+  if (hasType(normalizedType, "Employee")) {
+    return "employees";
+  }
+
+  if (hasType(normalizedType, "NestedInteger")) {
+    return "nested-integer";
+  }
+
+  if (hasType(normalizedType, "Iterator")) {
+    return "iterator";
+  }
+
+  if (hasType(normalizedType, "MountainArray")) {
+    return "mountain-array";
+  }
+
+  if (hasType(normalizedType, "CustomFunction")) {
+    return "custom-function";
+  }
+
+  if (hasType(normalizedType, "Master")) {
+    return "master";
+  }
+
+  if (hasType(normalizedType, "_Node") || hasType(normalizedType, "Node")) {
+    if (code.includes("neighbors")) {
+      return "graph";
+    }
+
+    if (code.includes("random")) {
+      return "random-list";
+    }
+
+    if (code.includes("isLeaf") || code.includes("topLeft")) {
+      return "quad-tree";
+    }
+
+    if (code.includes("children")) {
+      return "nary-tree";
+    }
+
+    if (code.includes("next") && code.includes("left") && code.includes("right")) {
+      return "binary-tree-next";
+    }
+  }
+
+  return null;
+}
+
+function getJsTypeHints(code) {
+  const params = [];
+  const paramPattern = /@param\s+\{([^}]+)\}\s+([A-Za-z_$][\w$]*)/g;
+  let paramMatch;
+
+  while ((paramMatch = paramPattern.exec(code))) {
+    params.push({
+      type: normalizeTypeName(paramMatch[1]),
+      name: paramMatch[2],
+    });
+  }
+
+  const returnType = normalizeTypeName(/@return\s+\{([^}]+)\}/.exec(code)?.[1]);
+
+  return { params, returnType };
+}
+
+function transformStructuredValue(value, type, code) {
+  const normalizedType = normalizeTypeName(type);
+  const structuredKind = getStructuredKind(normalizedType, code);
+
+  if (structuredKind === "employees") {
+    return arrayToEmployees(value);
+  }
+
+  if (normalizedType.endsWith("[]")) {
+    const itemType = normalizedType.slice(0, -2);
+    return Array.isArray(value)
+      ? value.map((item) => transformStructuredValue(item, itemType, code))
+      : value;
+  }
+
+  switch (structuredKind) {
+    case "linked-list":
+      return arrayToLinkedList(value);
+    case "binary-tree":
+      return arrayToBinaryTree(value);
+    case "binary-tree-next":
+      return arrayToBinaryTree(value, _Node);
+    case "nary-tree":
+      return arrayToNaryTree(value);
+    case "graph":
+      return arrayToGraph(value);
+    case "random-list":
+      return arrayToRandomList(value);
+    case "quad-tree":
+      return arrayToQuadTree(value);
+    case "employees":
+      return arrayToEmployees(value);
+    case "nested-integer":
+      return Array.isArray(value) ? value.map(arrayToNestedInteger) : arrayToNestedInteger(value);
+    case "iterator":
+      return arrayToIterator(value);
+    case "mountain-array":
+      return arrayToMountainArray(value);
+    case "custom-function":
+      return valueToCustomFunction(value);
+    case "master":
+      return value;
+    default:
+      break;
+  }
+
+  return value;
+}
+
+function serializeStructuredValue(value, type, code) {
+  const normalizedType = normalizeTypeName(type);
+
+  if (normalizedType.endsWith("[]")) {
+    const itemType = normalizedType.slice(0, -2);
+    return Array.isArray(value)
+      ? value.map((item) => serializeStructuredValue(item, itemType, code))
+      : value;
+  }
+
+  switch (getStructuredKind(normalizedType, code)) {
+    case "linked-list":
+      return linkedListToArray(value);
+    case "binary-tree":
+      return binaryTreeToArray(value);
+    case "binary-tree-next":
+      return binaryTreeNextToArray(value);
+    case "nary-tree":
+      return naryTreeToArray(value);
+    case "graph":
+      return graphToArray(value);
+    case "random-list":
+      return randomListToArray(value);
+    case "quad-tree":
+      return quadTreeToArray(value);
+    case "nested-integer":
+      return nestedIntegerToValue(value);
+    default:
+      break;
+  }
+
+  return value;
+}
+
+export function transformInputJS(values, code, names = []) {
+  const typeHints = getJsTypeHints(code);
+  const namedValues = new Map(names.map((name, index) => [name, values[index]]));
+
+  if (typeHints.params.length > 0 && names.length > 0) {
+    return typeHints.params.map((hint, index) => {
+      if (getStructuredKind(hint.type, code) === "custom-function") {
+        return valueToCustomFunction(namedValues.get(hint.name) ?? namedValues.get("function_id"));
+      }
+
+      if (getStructuredKind(hint.type, code) === "master") {
+        return valuesToMaster(namedValues.get("secret"), namedValues.get("allowedGuesses"));
+      }
+
+      const value = namedValues.has(hint.name) ? namedValues.get(hint.name) : values[index];
+
+      return transformStructuredValue(value, hint.type, code);
+    });
+  }
+
+  return values.map((value, index) => {
+    const hint =
+      typeHints.params.find((param) => param.name === names[index]) ?? typeHints.params[index];
+
+    return hint ? transformStructuredValue(value, hint.type, code) : value;
+  });
+}
+
+export function transformOutputJS(value, code, fallbackValue) {
+  const { returnType } = getJsTypeHints(code);
+
+  if (returnType === "void") {
+    return serializeStructuredValue(fallbackValue, getJsTypeHints(code).params[0]?.type, code);
+  }
+
+  return serializeStructuredValue(value, returnType, code);
 }
 
 function stableObject(value) {
@@ -369,10 +630,32 @@ async function getPyodideRuntime() {
 function compileUserCode(code, functionName, consoleApi) {
   const factory = Function(
     "console",
+    "ListNode",
+    "TreeNode",
+    "Node",
+    "_Node",
+    "Employee",
+    "NestedInteger",
+    "Iterator",
+    "MountainArray",
+    "CustomFunction",
+    "Master",
     `"use strict";\n${code}\n; return typeof ${functionName} !== "undefined" ? ${functionName} : undefined;`,
   );
 
-  const solution = factory(consoleApi);
+  const solution = factory(
+    consoleApi,
+    ListNode,
+    TreeNode,
+    Node,
+    _Node,
+    Employee,
+    NestedInteger,
+    Iterator,
+    MountainArray,
+    CustomFunction,
+    Master,
+  );
 
   if (typeof solution !== "function") {
     throw new Error(`Function "${functionName}" was not found`);
@@ -400,9 +683,18 @@ async function compilePythonCode(code, functionName) {
   const globals = pyodide.toPy({});
 
   try {
-    pyodide.runPython(code, { globals });
+    pyodide.runPython(`${PYTHON_PRELUDE}\n${code}`, { globals });
 
-    const solution = pyodide.runPython(functionName, { globals });
+    const solution = pyodide.runPython(
+      `
+__medik_solution = globals().get("${functionName}")
+if __medik_solution is None and "Solution" in globals():
+    __medik_instance = Solution()
+    __medik_solution = getattr(__medik_instance, "${functionName}", None)
+__medik_solution
+`,
+      { globals },
+    );
 
     if (typeof solution !== "function") {
       destroyPyProxy(solution);
@@ -426,8 +718,50 @@ function unsupportedWasmLanguageResult(request) {
     cases: [],
     logs: [],
     errorText:
-      "C/C++/Go source editing is enabled, but compiling arbitrary source to WASM is not wired yet. Use JavaScript or Python (Pyodide) for executable runs.",
+      "Запуск C/C#/C++/Go исходников через WASM требует отдельного compiler/runtime sandbox. Сейчас код для этих языков сохраняется и подсвечивается, но исполняемые метрики доступны только для JavaScript и Python (Pyodide).",
   };
+}
+
+function readDesignCase(parsedInput) {
+  const operationsIndex = parsedInput.names.findIndex((name) =>
+    ["operations", "methods", "actions"].includes(name),
+  );
+  const argumentsIndex = parsedInput.names.findIndex((name) =>
+    ["arguments", "args", "params"].includes(name),
+  );
+  const operations =
+    operationsIndex >= 0 ? parsedInput.values[operationsIndex] : parsedInput.values[0];
+  const args = argumentsIndex >= 0 ? parsedInput.values[argumentsIndex] : parsedInput.values[1];
+
+  if (
+    Array.isArray(operations) &&
+    operations.every((operation) => typeof operation === "string") &&
+    Array.isArray(args)
+  ) {
+    return { operations, args };
+  }
+
+  return null;
+}
+
+function executeDesignCase(Constructor, designCase, code) {
+  const [constructorArgs = [], ...methodArgs] = designCase.args;
+  const instance = new Constructor(...transformInputJS(constructorArgs, code));
+  const output = [null];
+
+  for (let index = 1; index < designCase.operations.length; index += 1) {
+    const methodName = designCase.operations[index];
+    const method = instance[methodName];
+
+    if (typeof method !== "function") {
+      throw new Error(`Method "${methodName}" was not found`);
+    }
+
+    const result = method.apply(instance, methodArgs[index - 1] ?? []);
+    output.push(typeof result === "undefined" ? null : result);
+  }
+
+  return output;
 }
 
 async function runJavaScriptUserCode(request) {
@@ -461,12 +795,23 @@ async function runJavaScriptUserCode(request) {
     try {
       const parsedInput = parseInputAssignments(testCase.input);
       const expected = evaluateLiteral(testCase.expected);
+      const designCase = readDesignCase(parsedInput);
+      const transformedInput = transformInputJS(
+        parsedInput.values,
+        request.code,
+        parsedInput.names,
+      );
       const memoryStartedBytes = await readMemoryBytes();
       solutionStartedAt = nowMs();
-      const output = await solution(...parsedInput.values);
+      const output = designCase
+        ? executeDesignCase(solution, designCase, request.code)
+        : await solution(...transformedInput);
       durationMs = nowMs() - solutionStartedAt;
-      const memoryBytes = await measureMemoryBytes(memoryStartedBytes, output);
-      const passed = compareValues(output, expected, request.judgeMode);
+      const normalizedOutput = designCase
+        ? output
+        : transformOutputJS(output, request.code, transformedInput[0]);
+      const memoryBytes = await measureMemoryBytes(memoryStartedBytes, normalizedOutput);
+      const passed = compareValues(normalizedOutput, expected, request.judgeMode);
 
       cases.push({
         id: testCase.id,
@@ -475,7 +820,7 @@ async function runJavaScriptUserCode(request) {
         durationMs,
         memoryBytes,
         inputText: testCase.input,
-        outputText: stringifyValue(output),
+        outputText: stringifyValue(normalizedOutput),
         expectedText: stringifyValue(expected),
       });
     } catch (error) {

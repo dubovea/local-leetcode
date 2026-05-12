@@ -1,4 +1,4 @@
-import { CheckSquare, Code2, FileText } from "lucide-react";
+import { AlertCircle, CheckSquare, Code2, FileText } from "lucide-react";
 import type { CodeLanguage, Problem, RunResult, TestCase } from "@/entities/problem/model/types";
 import { codeLanguageOptions } from "@/entities/problem/model/codeLanguages";
 import { SolutionEditor } from "@/features/problem-editor/ui/SolutionEditor";
@@ -43,6 +43,8 @@ export function CodeWorkspace({
   onCodeDraftChange: (problemId: string, language: CodeLanguage, code: string) => void;
   onRun: () => void;
 }) {
+  const missingActiveLanguageSnippet = (problem.missingCodeLanguages ?? []).includes(language);
+
   function updateTestCases(testCases: TestCase[]) {
     onProblemChange({ ...problem, testCases });
   }
@@ -55,25 +57,36 @@ export function CodeWorkspace({
             <Code2 className="h-4 w-4 text-[var(--lc-success)]" />
             Code
           </div>
-          <Select
-            value={language}
-            onValueChange={(value) => onLanguageChange(value as CodeLanguage)}
-          >
-            <SelectTrigger
-              aria-label="Code language"
-              className="h-8 w-44 border-[var(--lc-border)] bg-[var(--lc-panel)] text-xs text-[var(--lc-text-strong)]"
-              title="Code language"
+          <div className="flex items-center gap-2">
+            {missingActiveLanguageSnippet ? (
+              <div
+                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--lc-warning)]/40 bg-[var(--lc-warning)]/10 px-2 py-1 text-xs text-[var(--lc-warning)]"
+                title="Snippet for this language was not found in the imported dataset. A generated starter was inserted; support may appear later."
+              >
+                <AlertCircle className="h-3.5 w-3.5" />
+                Generated starter
+              </div>
+            ) : null}
+            <Select
+              value={language}
+              onValueChange={(value) => onLanguageChange(value as CodeLanguage)}
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-[var(--lc-panel-raised)]">
-              {codeLanguageOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                aria-label="Code language"
+                className="h-8 w-44 border-[var(--lc-border)] bg-[var(--lc-panel)] text-xs text-[var(--lc-text-strong)]"
+                title="Code language"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[var(--lc-panel-raised)]">
+                {codeLanguageOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="h-[calc(100%-44px)]">
           <SolutionEditor

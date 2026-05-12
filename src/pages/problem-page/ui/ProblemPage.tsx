@@ -21,11 +21,75 @@ type BottomTab = "testcase" | "result";
 type AppTheme = "dark" | "light";
 
 const THEME_STORAGE_KEY = "medikcode:theme";
+const PERFORMANCE_NOTICE_STORAGE_KEY = "medikcode:v1:performance-notice-hidden";
 
 function getInitialTheme(): AppTheme {
   const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
 
   return storedTheme === "light" ? "light" : "dark";
+}
+
+function getInitialPerformanceNoticeOpen() {
+  return localStorage.getItem(PERFORMANCE_NOTICE_STORAGE_KEY) !== "true";
+}
+
+function PerformanceNoticeDialog({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  onClose: (hidePermanently: boolean) => void;
+}) {
+  const [hidePermanently, setHidePermanently] = useState(false);
+
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+      <div className="w-full max-w-xl rounded-xl border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-5 shadow-2xl">
+        <div className="mb-3 text-lg font-semibold text-[var(--lc-text-strong)]">
+          Измерения производительности
+        </div>
+        <div className="space-y-3 text-sm leading-6 text-[var(--lc-text)]">
+          <p>
+            JavaScript запускается в браузерном Web Worker. Таймер оборачивает только вызов
+            пользовательской функции, конструктора или метода; парсинг входных данных и сравнение
+            ответа не входят в runtime. На очень коротких тестах погрешность обычно около 0.1-2 мс,
+            иногда до 5 мс из-за планировщика браузера и сборщика мусора.
+          </p>
+          <p>
+            Python работает через Pyodide/WebAssembly. По сравнению с нативным CPython время часто
+            отличается примерно в 2-10 раз, а память может быть выше на 20-80 МБ из-за runtime
+            Pyodide. Для C/C#/C++/Go после подключения compiler/runtime sandbox WASM обычно даёт
+            около +10-100% ко времени для C/C++, около +50-300% для Go/C# runtime-задач и примерно
+            +1-80 МБ к памяти из-за linear memory, runtime и glue-кода.
+          </p>
+          <p>
+            Память считается приблизительно: сначала используются доступные browser memory API,
+            затем fallback по размеру удерживаемого результата. Значения могут отличаться от
+            LeetCode на десятки процентов, а для маленьких решений - на десятки мегабайт, потому что
+            браузер, Worker, JIT/WASM runtime и состояние вкладки тоже влияют на замер.
+          </p>
+        </div>
+
+        <label className="mt-4 flex items-center gap-2 text-sm text-[var(--lc-muted)]">
+          <input
+            checked={hidePermanently}
+            className="h-4 w-4"
+            type="checkbox"
+            onChange={(event) => setHidePermanently(event.target.checked)}
+          />
+          Больше не показывать
+        </label>
+
+        <div className="mt-5 flex justify-end">
+          <Button onClick={() => onClose(hidePermanently)}>Понятно</Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function resultToSubmission(result: RunResult, code: string, language: CodeLanguage): Submission {
@@ -73,7 +137,11 @@ export function ProblemPage() {
   const [editorResetKey, setEditorResetKey] = useState(0);
   const [theme, setTheme] = useState<AppTheme>(getInitialTheme);
   const [activeLanguage, setActiveLanguage] = useState<CodeLanguage>(DEFAULT_CODE_LANGUAGE);
+  const [performanceNoticeOpen, setPerformanceNoticeOpen] = useState(
+    getInitialPerformanceNoticeOpen,
+  );
   const latestCodeByLanguageRef = useRef<Partial<Record<CodeLanguage, string>>>({});
+  const latestCodeProblemIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     void initialize();
@@ -91,6 +159,7 @@ export function ProblemPage() {
 
     const nextLanguage = activeProblem.activeLanguage ?? DEFAULT_CODE_LANGUAGE;
 
+    latestCodeProblemIdRef.current = activeProblem.id;
     latestCodeByLanguageRef.current = {
       ...(activeProblem.codeByLanguage ?? {}),
       [DEFAULT_CODE_LANGUAGE]:
@@ -103,15 +172,24 @@ export function ProblemPage() {
     setBottomTab("testcase");
   }, [activeProblem?.id]);
 
+  const draftMatchesActiveProblem = activeProblem
+    ? latestCodeProblemIdRef.current === activeProblem.id
+    : false;
+  const currentLanguage =
+    activeProblem && !draftMatchesActiveProblem
+      ? (activeProblem.activeLanguage ?? DEFAULT_CODE_LANGUAGE)
+      : activeLanguage;
+
   const execute = useCallback(
     async (saveSubmission: boolean) => {
       if (!activeProblem || running) {
         return;
       }
 
+      const language = currentLanguage;
       const code =
-        latestCodeByLanguageRef.current[activeLanguage] ??
-        getProblemCode(activeProblem, activeLanguage);
+        (draftMatchesActiveProblem ? latestCodeByLanguageRef.current[language] : undefined) ??
+        getProblemCode(activeProblem, language);
       const testCases = activeProblem.testCases;
 
       if (testCases.length === 0) {
@@ -123,7 +201,7 @@ export function ProblemPage() {
 
       const result = await runInWorker({
         code,
-        language: activeLanguage,
+        language,
         functionName: activeProblem.functionName,
         judgeMode: activeProblem.judgeMode,
         testCases,
@@ -132,18 +210,21 @@ export function ProblemPage() {
       setLastResult(result);
 
       if (saveSubmission) {
-        await addSubmission(
-          activeProblem.id,
-          resultToSubmission(result, code, activeLanguage),
-          code,
-        );
+        await addSubmission(activeProblem.id, resultToSubmission(result, code, language), code);
       } else {
-        void saveProblemCode(activeProblem.id, activeLanguage, code);
+        void saveProblemCode(activeProblem.id, language, code);
       }
 
       setRunning(false);
     },
-    [activeLanguage, activeProblem, addSubmission, running, saveProblemCode],
+    [
+      activeProblem,
+      addSubmission,
+      currentLanguage,
+      draftMatchesActiveProblem,
+      running,
+      saveProblemCode,
+    ],
   );
 
   async function handleSelectProblem(problemId: string) {
@@ -153,6 +234,7 @@ export function ProblemPage() {
 
   function handleCodeDraftChange(problemId: string, language: CodeLanguage, code: string) {
     if (problemId === activeProblemId) {
+      latestCodeProblemIdRef.current = problemId;
       latestCodeByLanguageRef.current = {
         ...latestCodeByLanguageRef.current,
         [language]: code,
@@ -165,22 +247,25 @@ export function ProblemPage() {
   }
 
   async function handleLanguageChange(language: CodeLanguage) {
-    if (!activeProblem || language === activeLanguage) {
+    if (!activeProblem || language === currentLanguage) {
       return;
     }
 
+    const hasActiveDraft = latestCodeProblemIdRef.current === activeProblem.id;
     const currentCode =
-      latestCodeByLanguageRef.current[activeLanguage] ??
-      getProblemCode(activeProblem, activeLanguage);
+      (hasActiveDraft ? latestCodeByLanguageRef.current[currentLanguage] : undefined) ??
+      getProblemCode(activeProblem, currentLanguage);
     const nextCode =
-      latestCodeByLanguageRef.current[language] ?? getProblemCode(activeProblem, language);
+      (hasActiveDraft ? latestCodeByLanguageRef.current[language] : undefined) ??
+      getProblemCode(activeProblem, language);
     const codeByLanguage = {
       ...(activeProblem.codeByLanguage ?? {}),
-      ...latestCodeByLanguageRef.current,
-      [activeLanguage]: currentCode,
+      ...(hasActiveDraft ? latestCodeByLanguageRef.current : {}),
+      [currentLanguage]: currentCode,
       [language]: nextCode,
     };
 
+    latestCodeProblemIdRef.current = activeProblem.id;
     latestCodeByLanguageRef.current = codeByLanguage;
     setActiveLanguage(language);
     setLastResult(null);
@@ -205,6 +290,7 @@ export function ProblemPage() {
       return;
     }
 
+    latestCodeProblemIdRef.current = activeProblem.id;
     latestCodeByLanguageRef.current = {
       ...latestCodeByLanguageRef.current,
       [restored.language]: restored.code,
@@ -222,23 +308,26 @@ export function ProblemPage() {
   }
 
   async function handleProblemChange(problem: Problem) {
-    const code =
-      problem.id === activeProblemId
-        ? (latestCodeByLanguageRef.current[activeLanguage] ??
-          getProblemCode(problem, activeLanguage))
-        : problem.code;
-    const codeByLanguage =
-      problem.id === activeProblemId
-        ? {
-            ...(problem.codeByLanguage ?? {}),
-            ...latestCodeByLanguageRef.current,
-            [activeLanguage]: code,
-          }
-        : problem.codeByLanguage;
+    const isActiveProblem = problem.id === activeProblemId;
+    const language = isActiveProblem
+      ? currentLanguage
+      : (problem.activeLanguage ?? DEFAULT_CODE_LANGUAGE);
+    const hasProblemDraft = latestCodeProblemIdRef.current === problem.id;
+    const code = isActiveProblem
+      ? ((hasProblemDraft ? latestCodeByLanguageRef.current[language] : undefined) ??
+        getProblemCode(problem, language))
+      : problem.code;
+    const codeByLanguage = isActiveProblem
+      ? {
+          ...(problem.codeByLanguage ?? {}),
+          ...(hasProblemDraft ? latestCodeByLanguageRef.current : {}),
+          [language]: code,
+        }
+      : problem.codeByLanguage;
 
     await updateActiveProblem({
       ...problem,
-      activeLanguage: problem.id === activeProblemId ? activeLanguage : problem.activeLanguage,
+      activeLanguage: isActiveProblem ? language : problem.activeLanguage,
       code,
       codeByLanguage,
     });
@@ -247,6 +336,14 @@ export function ProblemPage() {
   async function handleImportBackup(backup: ProblemsBackup | Problem[]) {
     await importBackup(backup);
     setDrawerOpen(false);
+  }
+
+  function handleClosePerformanceNotice(hidePermanently: boolean) {
+    if (hidePermanently) {
+      localStorage.setItem(PERFORMANCE_NOTICE_STORAGE_KEY, "true");
+    }
+
+    setPerformanceNoticeOpen(false);
   }
 
   const handleDescriptionChange = useCallback(
@@ -323,6 +420,11 @@ export function ProblemPage() {
           onDeleteProblem={(problemId) => void deleteProblem(problemId)}
         />
 
+        <PerformanceNoticeDialog
+          open={performanceNoticeOpen}
+          onClose={handleClosePerformanceNotice}
+        />
+
         <main className="flex flex-1 items-center justify-center p-6">
           <div className="max-w-sm text-center">
             <h1 className="mb-2 text-xl font-semibold text-[var(--lc-text-strong)]">
@@ -366,6 +468,11 @@ export function ProblemPage() {
         onDeleteProblem={(problemId) => void deleteProblem(problemId)}
       />
 
+      <PerformanceNoticeDialog
+        open={performanceNoticeOpen}
+        onClose={handleClosePerformanceNotice}
+      />
+
       <main className="grid min-h-0 flex-1 grid-cols-[46%_54%] gap-2 p-2">
         <ProblemDescriptionPanel
           problem={activeProblem}
@@ -379,11 +486,12 @@ export function ProblemPage() {
           activeCaseId={activeCaseId}
           bottomTab={bottomTab}
           code={
-            latestCodeByLanguageRef.current[activeLanguage] ??
-            getProblemCode(activeProblem, activeLanguage)
+            (draftMatchesActiveProblem
+              ? latestCodeByLanguageRef.current[currentLanguage]
+              : undefined) ?? getProblemCode(activeProblem, currentLanguage)
           }
           editorResetKey={editorResetKey}
-          language={activeLanguage}
+          language={currentLanguage}
           problem={activeProblem}
           result={lastResult}
           theme={theme}

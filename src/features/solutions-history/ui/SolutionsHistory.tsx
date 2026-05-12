@@ -246,7 +246,7 @@ function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
             label="Best"
             value={
               bestOverallPoint
-                ? `${bestOverallPoint.label} · ${formatRuntime(bestOverallPoint.runtimeMs)}`
+                ? `${bestOverallPoint.label} - ${formatRuntime(bestOverallPoint.runtimeMs)}`
                 : "N/A"
             }
           />
@@ -473,7 +473,7 @@ export function SolutionsHistory({
   if (submissions.length === 0) {
     return (
       <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--lc-border-strong)] bg-[var(--lc-panel-raised)] p-8 text-center text-sm text-[var(--lc-muted)]">
-        Submit a solution to see successful and failed attempts here.
+        Отправьте решение, чтобы увидеть здесь успешные и неудачные попытки.
       </div>
     );
   }

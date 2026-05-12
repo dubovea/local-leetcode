@@ -31,6 +31,13 @@ export const codeLanguageOptions: Array<{
     tabSize: 4,
   },
   {
+    value: "csharp-wasm",
+    label: "C# (WASM)",
+    monacoLanguage: "csharp",
+    extension: "cs",
+    tabSize: 4,
+  },
+  {
     value: "cpp-wasm",
     label: "C++ (WASM)",
     monacoLanguage: "cpp",
@@ -39,7 +46,7 @@ export const codeLanguageOptions: Array<{
   },
   {
     value: "go-wasm",
-    label: "Go (WASM)",
+    label: "GoLang (WASM)",
     monacoLanguage: "go",
     extension: "go",
     tabSize: 4,
@@ -75,21 +82,27 @@ function getProblemParameters(problem: Problem) {
 export function getStarterCodeForLanguage(problem: Problem, language: CodeLanguage) {
   const functionName = problem.functionName || "solution";
   const parameters = getProblemParameters(problem);
+  const notice =
+    "Snippet for this language was not found in the imported dataset. Support may appear later.";
 
   if (language === "python-pyodide") {
-    return `def ${functionName}(${parameters.length > 0 ? parameters.join(", ") : "*args"}):\n    return None\n`;
+    return `# ${notice}\n\ndef ${functionName}(${parameters.length > 0 ? parameters.join(", ") : "*args"}):\n    return None\n`;
   }
 
   if (language === "cpp-wasm") {
-    return `#include <vector>\nusing namespace std;\n\nauto ${functionName}() {\n    return 0;\n}\n`;
+    return `// ${notice}\n\n#include <vector>\nusing namespace std;\n\nauto ${functionName}() {\n    return 0;\n}\n`;
   }
 
   if (language === "c-wasm") {
-    return `int ${functionName}(void) {\n    return 0;\n}\n`;
+    return `// ${notice}\n\nint ${functionName}(void) {\n    return 0;\n}\n`;
+  }
+
+  if (language === "csharp-wasm") {
+    return `// ${notice}\n\npublic class Solution {\n    public object ${functionName}() {\n        return null;\n    }\n}\n`;
   }
 
   if (language === "go-wasm") {
-    return `package main\n\nfunc ${functionName}() any {\n    return nil\n}\n`;
+    return `// ${notice}\n\npackage main\n\nfunc ${functionName}() any {\n    return nil\n}\n`;
   }
 
   return problem.code;

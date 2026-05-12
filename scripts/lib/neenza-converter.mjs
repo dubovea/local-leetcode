@@ -1,6 +1,22 @@
-const INPUT_LABEL_RE = /Input\s*:/i;
-const OUTPUT_LABEL_RE = /Output\s*:/i;
-const OUTPUT_END_RE = /\n\s*(Explanation|Constraints|Note|Follow[- ]?up)\s*:/i;
+const INPUT_LABEL_RE = /(?:^|\n)\s*Input\s*:?\s*/i;
+const OUTPUT_LABEL_RE = /\n\s*Output\s*:?\s*/i;
+const OUTPUT_END_RE = /\n\s*(Explanation|Constraints|Note|Follow[- ]?up)\s*:?/i;
+const SUPPORTED_CODE_LANGUAGES = [
+  "javascript",
+  "python-pyodide",
+  "c-wasm",
+  "csharp-wasm",
+  "cpp-wasm",
+  "go-wasm",
+];
+const SNIPPET_SLUGS_BY_LANGUAGE = {
+  javascript: ["javascript", "typescript"],
+  "python-pyodide": ["python3", "python"],
+  "c-wasm": ["c"],
+  "csharp-wasm": ["csharp"],
+  "cpp-wasm": ["cpp"],
+  "go-wasm": ["golang"],
+};
 
 function normalizeDataset(dataset) {
   if (Array.isArray(dataset)) return dataset;
@@ -86,19 +102,36 @@ function normalizeTopics(problem) {
   return [];
 }
 
-function getCodeSnippet(problem) {
+function normalizeSnippetEntries(problem) {
   const snippets = problem.code_snippets;
-  if (!snippets) return "";
+  if (!snippets) return new Map();
 
   if (Array.isArray(snippets)) {
-    return (
-      snippets.find((snippet) => snippet.langSlug === "javascript")?.code ??
-      snippets.find((snippet) => snippet.langSlug === "typescript")?.code ??
-      ""
+    return new Map(
+      snippets
+        .map((snippet) => [snippet.langSlug ?? snippet.lang ?? snippet.language, snippet.code])
+        .filter(([slug, code]) => slug && typeof code === "string"),
     );
   }
 
-  return snippets.javascript ?? snippets.typescript ?? "";
+  return new Map(Object.entries(snippets).filter(([, code]) => typeof code === "string"));
+}
+
+function getCodeSnippetsByLanguage(problem) {
+  const snippets = normalizeSnippetEntries(problem);
+  const codeByLanguage = {};
+
+  for (const language of SUPPORTED_CODE_LANGUAGES) {
+    const snippet = SNIPPET_SLUGS_BY_LANGUAGE[language]
+      .map((slug) => snippets.get(slug))
+      .find((code) => typeof code === "string" && code.trim());
+
+    if (snippet) {
+      codeByLanguage[language] = snippet;
+    }
+  }
+
+  return codeByLanguage;
 }
 
 function extractFunctionName(code, title) {
@@ -126,7 +159,7 @@ function extractFunctionName(code, title) {
 }
 
 function createStarterCode(problem, title) {
-  const snippet = getCodeSnippet(problem).trim();
+  const snippet = (getCodeSnippetsByLanguage(problem).javascript ?? "").trim();
   if (snippet) return snippet;
 
   const functionName = extractFunctionName("", title);
@@ -162,18 +195,40 @@ function parseExampleText(exampleText, id) {
   const expected = cleanExpected(sectionBetween(exampleText, OUTPUT_LABEL_RE, OUTPUT_END_RE));
 
   if (!input || !expected) return null;
-  return { id, input, expected };
+  return { id, input: normalizeTestInput(input), expected };
+}
+
+function normalizeTestInput(input) {
+  const lines = input
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length >= 2 && lines[0].startsWith("[") && lines[1].startsWith("[")) {
+    return `operations = ${lines[0]}, arguments = ${lines[1]}`;
+  }
+
+  return input;
+}
+
+function normalizeExampleList(examples) {
+  if (typeof examples === "string") {
+    return [{ example_num: 1, example_text: examples }];
+  }
+
+  if (Array.isArray(examples)) {
+    return examples;
+  }
+
+  if (examples && typeof examples === "object") {
+    return [examples];
+  }
+
+  return [];
 }
 
 function normalizeExamples(problem, problemId) {
-  if (typeof problem.examples === "string") {
-    const testCase = parseExampleText(problem.examples, `${problemId}-case-1`);
-    return testCase ? [testCase] : [];
-  }
-
-  if (!Array.isArray(problem.examples)) return [];
-
-  return problem.examples
+  return normalizeExampleList(problem.examples)
     .map((example, index) =>
       parseExampleText(
         example.example_text ?? example.text ?? "",
@@ -188,14 +243,7 @@ function normalizeExampleMarkdownText(text) {
 }
 
 function getExampleMarkdownEntries(problem) {
-  if (typeof problem.examples === "string") {
-    const text = normalizeExampleMarkdownText(problem.examples);
-    return text ? [{ number: 1, text }] : [];
-  }
-
-  if (!Array.isArray(problem.examples)) return [];
-
-  return problem.examples
+  return normalizeExampleList(problem.examples)
     .map((example, index) => ({
       number: example.example_num ?? index + 1,
       text: normalizeExampleMarkdownText(example.example_text ?? example.text ?? ""),
@@ -259,11 +307,9 @@ function buildDescriptionMarkdown(problem, title, number) {
   parts.push(...examplesMarkdown);
 
   if (hasConstraints) {
-    parts.push(`## Constraints\n\n${constraints.map((constraint) => `- ${constraint}`).join("\n")}`);
-  }
-
-  if (Array.isArray(problem.hints) && problem.hints.length > 0) {
-    parts.push(`## Hints\n\n${problem.hints.map((hint) => `- ${hint}`).join("\n")}`);
+    parts.push(
+      `## Constraints\n\n${constraints.map((constraint) => `- ${constraint}`).join("\n")}`,
+    );
   }
 
   return parts.filter(Boolean).join("\n\n");
@@ -285,7 +331,17 @@ function problemFromNeenza(problem) {
 
   const id = `lc-${number}`;
   const code = createStarterCode(problem, title);
+  const codeByLanguage = getCodeSnippetsByLanguage(problem);
+  if (!codeByLanguage.javascript) {
+    codeByLanguage.javascript = code;
+  }
+  const missingCodeLanguages = SUPPORTED_CODE_LANGUAGES.filter(
+    (language) => !codeByLanguage[language],
+  );
   const topics = normalizeTopics(problem);
+  const hints = Array.isArray(problem.hints)
+    ? problem.hints.filter((hint) => typeof hint === "string" && hint.trim())
+    : [];
 
   const testCases = normalizeExamples(problem, id);
 
@@ -302,6 +358,10 @@ function problemFromNeenza(problem) {
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,
+    activeLanguage: "javascript",
+    codeByLanguage,
+    missingCodeLanguages,
+    hints,
     testCases:
       testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
     submissions: [],

@@ -33,7 +33,7 @@ import type {
 const LEGACY_SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
 const SELECTED_PROBLEM_KEY = "medikcode:v1:selected-problem-id";
 const PROBLEMS_INITIALIZED_KEY = "medikcode:v1:problems-initialized";
-const PATTERN_SEED_KEY = "medikcode:v2:pattern-problems-seeded";
+const PATTERN_SEED_KEY = "medikcode:v3:pattern-problems-seeded";
 
 function getSeedProblems() {
   return [...generatedPatternProblems, ...generatedNeenzaProblems, ...defaultProblems];
@@ -69,6 +69,19 @@ function markPatternSeedImported() {
   localStorage.setItem(PATTERN_SEED_KEY, "true");
 }
 
+function extractHintsFromMarkdown(markdown: string) {
+  const match = /(?:^|\n)## Hints\s*\n+([\s\S]*?)(?=\n##\s+|\n#\s+|$)/i.exec(markdown);
+
+  if (!match) {
+    return [];
+  }
+
+  return match[1]
+    .split("\n")
+    .map((line) => line.replace(/^\s*[-*]\s+/, "").trim())
+    .filter((line) => line && !line.startsWith("#"));
+}
+
 function normalizeProblem(problem: Problem): Problem {
   const activeLanguage = isCodeLanguage(problem.activeLanguage)
     ? problem.activeLanguage
@@ -94,12 +107,18 @@ function normalizeProblem(problem: Problem): Problem {
     ...submission,
     language: isCodeLanguage(submission.language) ? submission.language : DEFAULT_CODE_LANGUAGE,
   }));
+  const missingCodeLanguages = (problem.missingCodeLanguages ?? []).filter(isCodeLanguage);
 
   return {
     ...problem,
     activeLanguage,
     code: codeByLanguage[activeLanguage] ?? problem.code,
     codeByLanguage,
+    hints:
+      problem.hints && problem.hints.length > 0
+        ? problem.hints
+        : extractHintsFromMarkdown(problem.descriptionMarkdown),
+    missingCodeLanguages,
     notesMarkdown: problem.notesMarkdown ?? "",
     submissions,
     testCases: problem.testCases ?? [],
@@ -121,6 +140,11 @@ function mergeProblem(existing: Problem | undefined, incoming: Problem): Problem
       ...(incoming.codeByLanguage ?? {}),
       ...(existing.codeByLanguage ?? {}),
     },
+    hints: existing.hints && existing.hints.length > 0 ? existing.hints : (incoming.hints ?? []),
+    missingCodeLanguages:
+      existing.missingCodeLanguages && existing.missingCodeLanguages.length > 0
+        ? existing.missingCodeLanguages
+        : (incoming.missingCodeLanguages ?? []),
     notesMarkdown: existing.notesMarkdown ?? incoming.notesMarkdown ?? "",
     topics:
       existing.topics && existing.topics.length > 0 ? existing.topics : (incoming.topics ?? []),
@@ -180,18 +204,23 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
         markPatternSeedImported();
       } else if (hasStoredProblems) {
         markProblemsInitialized();
+      } else {
+        markPatternSeedImported();
       }
 
       let index = await getProblemIndexFromDb();
 
       if (hasStoredProblems && !patternSeedImported()) {
-        const existingProblemIds = new Set(index.map((item) => item.id));
-        const missingPatternProblems = generatedPatternProblems.filter(
-          (problem) => !existingProblemIds.has(problem.id),
+        const existingProblems = await getAllProblemsFromDb();
+        const existingById = new Map(
+          existingProblems.map((problem) => [problem.id, normalizeProblem(problem)]),
+        );
+        const patternProblems = generatedPatternProblems.map((problem) =>
+          mergeProblem(existingById.get(problem.id), problem),
         );
 
-        if (missingPatternProblems.length > 0) {
-          await putProblemsToDb(missingPatternProblems.map(normalizeProblem));
+        if (patternProblems.length > 0) {
+          await putProblemsToDb(patternProblems);
           index = await getProblemIndexFromDb();
         }
 

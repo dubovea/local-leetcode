@@ -1,23 +1,11 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import {
-  BookOpen,
-  CheckCircle2,
-  Eye,
-  FileText,
-  Pencil,
-  ScrollText,
-} from "lucide-react";
+import { BookOpen, CheckCircle2, Eye, FileText, Lightbulb, Pencil, ScrollText } from "lucide-react";
 
 import type { Problem, ProblemListItem } from "@/entities/problem/model/types";
 import { DifficultyBadge } from "@/shared/ui/DifficultyBadge";
 import { MarkdownView } from "@/shared/ui/MarkdownView";
 import { Button } from "@/shared/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/shared/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Textarea } from "@/shared/ui/textarea";
 import { SolutionsHistory } from "@/features/solutions-history/ui/SolutionsHistory";
 import { PatternGuide } from "@/features/pattern-guide/ui/PatternGuide";
@@ -27,8 +15,7 @@ type Tab = "description" | "solutions" | "patterns";
 const tabsTriggerClassName =
   "h-8 gap-1.5 rounded-md px-3 text-sm text-[var(--lc-muted)] shadow-none data-[state=active]:bg-[var(--lc-active)] data-[state=active]:text-[var(--lc-text-strong)]";
 
-const tabsContentClassName =
-  "m-0 h-full min-h-0 overflow-auto p-5 data-[state=inactive]:hidden";
+const tabsContentClassName = "m-0 h-full min-h-0 overflow-auto p-5 data-[state=inactive]:hidden";
 
 const MemoSolutionsHistory = memo(SolutionsHistory);
 const MemoPatternGuide = memo(PatternGuide);
@@ -56,6 +43,10 @@ function withoutTopicsSection(markdown: string) {
   return markdown.replace(/\n{0,2}## Topics\s*\n+[\s\S]*?(?=\n##\s+|\n#\s+|$)/i, "\n\n").trim();
 }
 
+function withoutHintsSection(markdown: string) {
+  return markdown.replace(/\n{0,2}## Hints\s*\n+[\s\S]*?(?=\n##\s+|\n#\s+|$)/i, "\n\n").trim();
+}
+
 function withoutLeadingTitle(markdown: string) {
   return markdown.replace(/^#\s+.+(?:\n+|$)/, "").trim();
 }
@@ -70,6 +61,44 @@ function sameStringArray(a?: string[], b?: string[]) {
   }
 
   return a.every((value, index) => value === b[index]);
+}
+
+function cleanHintText(hint: string) {
+  return hint
+    .replace(/<\/?code>/g, "`")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function HintsHover({ hints }: { hints: string[] }) {
+  if (hints.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="group/hints relative inline-flex">
+      <button
+        className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-xs font-semibold text-[var(--lc-warning)] transition-colors hover:bg-[var(--lc-hover)] focus-visible:bg-[var(--lc-hover)] focus-visible:outline-none"
+        type="button"
+      >
+        <Lightbulb className="h-4 w-4" />
+        Hints
+      </button>
+
+      <div className="pointer-events-none absolute right-0 top-full z-30 mt-2 hidden w-96 max-w-[calc(100vw-48px)] rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-3 text-xs text-[var(--lc-text)] shadow-xl group-hover/hints:block group-focus-within/hints:block">
+        <div className="mb-2 font-semibold text-[var(--lc-text-strong)]">Hints</div>
+        <ol className="space-y-2">
+          {hints.map((hint, index) => (
+            <li key={`${index}-${hint}`} className="leading-5">
+              <span className="font-semibold text-[var(--lc-muted)]">{index + 1}. </span>
+              {cleanHintText(hint)}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
 }
 
 export const ProblemDescriptionPanel = memo(
@@ -99,11 +128,16 @@ export const ProblemDescriptionPanel = memo(
       return topics.length > 0 ? topics : topicsFromMarkdown(problem.descriptionMarkdown);
     }, [topics, problem.descriptionMarkdown]);
 
+    const hints = useMemo(() => {
+      return (problem.hints ?? []).map(cleanHintText).filter(Boolean);
+    }, [problem.hints]);
+
     const previewMarkdown = useMemo(() => {
-      const markdown =
+      const withoutTopics =
         visibleTopics.length > 0
           ? withoutTopicsSection(problem.descriptionMarkdown)
           : problem.descriptionMarkdown;
+      const markdown = withoutHintsSection(withoutTopics);
 
       return withoutLeadingTitle(markdown);
     }, [problem.descriptionMarkdown, visibleTopics.length]);
@@ -128,11 +162,7 @@ export const ProblemDescriptionPanel = memo(
 
     return (
       <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
-        <Tabs
-          className="flex h-full min-h-0 flex-col"
-          value={tab}
-          onValueChange={changeTab}
-        >
+        <Tabs className="flex h-full min-h-0 flex-col" value={tab} onValueChange={changeTab}>
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
             <TabsList className="h-8 bg-transparent p-0" variant="line">
               <TabsTrigger className={tabsTriggerClassName} value="description">
@@ -160,11 +190,7 @@ export const ProblemDescriptionPanel = memo(
           </div>
 
           <div className="min-h-0 flex-1">
-            <TabsContent
-              forceMount
-              className={tabsContentClassName}
-              value="description"
-            >
+            <TabsContent forceMount className={tabsContentClassName} value="description">
               <div>
                 <div className="mb-5 flex items-start justify-between gap-4">
                   <div className="min-w-0">
@@ -186,10 +212,9 @@ export const ProblemDescriptionPanel = memo(
                     </div>
                   </div>
 
-                  <Button
-                    variant="ghost"
-                    onClick={() => setEditingMarkdown((value) => !value)}
-                  >
+                  <HintsHover hints={hints} />
+
+                  <Button variant="ghost" onClick={() => setEditingMarkdown((value) => !value)}>
                     <EditIcon className="h-4 w-4" />
                     {editingMarkdown ? "Предпросмотр" : "Править"}
                   </Button>
@@ -232,11 +257,7 @@ export const ProblemDescriptionPanel = memo(
               </div>
             </TabsContent>
 
-            <TabsContent
-              forceMount
-              className={tabsContentClassName}
-              value="solutions"
-            >
+            <TabsContent forceMount className={tabsContentClassName} value="solutions">
               <MemoSolutionsHistory
                 submissions={problem.submissions}
                 onRestore={onRestoreSubmission}
@@ -244,15 +265,8 @@ export const ProblemDescriptionPanel = memo(
               />
             </TabsContent>
 
-            <TabsContent
-              forceMount
-              className={tabsContentClassName}
-              value="patterns"
-            >
-              <MemoPatternGuide
-                problems={problemIndex}
-                onSelectProblem={openLinkedProblem}
-              />
+            <TabsContent forceMount className={tabsContentClassName} value="patterns">
+              <MemoPatternGuide problems={problemIndex} onSelectProblem={openLinkedProblem} />
             </TabsContent>
           </div>
         </Tabs>
@@ -268,6 +282,7 @@ export const ProblemDescriptionPanel = memo(
       prev.problem.descriptionMarkdown === next.problem.descriptionMarkdown &&
       prev.problem.notesMarkdown === next.problem.notesMarkdown &&
       prev.problem.submissions === next.problem.submissions &&
+      sameStringArray(prev.problem.hints, next.problem.hints) &&
       sameStringArray(prev.problem.topics, next.problem.topics) &&
       prev.problemIndex === next.problemIndex &&
       prev.onChange === next.onChange &&

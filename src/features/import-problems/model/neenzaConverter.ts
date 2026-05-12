@@ -1,9 +1,25 @@
 import type { Difficulty, JudgeMode, Problem, TestCase } from "@/entities/problem/model/types";
 
 const DIFFICULTIES: Difficulty[] = ["Easy", "Medium", "Hard"];
-const INPUT_LABEL_RE = /Input\s*:/i;
-const OUTPUT_LABEL_RE = /Output\s*:/i;
-const OUTPUT_END_RE = /\n\s*(Explanation|Constraints|Note|Follow[- ]?up)\s*:/i;
+const INPUT_LABEL_RE = /(?:^|\n)\s*Input\s*:?\s*/i;
+const OUTPUT_LABEL_RE = /\n\s*Output\s*:?\s*/i;
+const OUTPUT_END_RE = /\n\s*(Explanation|Constraints|Note|Follow[- ]?up)\s*:?/i;
+const SUPPORTED_CODE_LANGUAGES = [
+  "javascript",
+  "python-pyodide",
+  "c-wasm",
+  "csharp-wasm",
+  "cpp-wasm",
+  "go-wasm",
+] as const;
+const SNIPPET_SLUGS_BY_LANGUAGE: Record<(typeof SUPPORTED_CODE_LANGUAGES)[number], string[]> = {
+  javascript: ["javascript", "typescript"],
+  "python-pyodide": ["python3", "python"],
+  "c-wasm": ["c"],
+  "csharp-wasm": ["csharp"],
+  "cpp-wasm": ["cpp"],
+  "go-wasm": ["golang"],
+};
 
 type NeenzaExample = {
   example_num?: number;
@@ -31,7 +47,9 @@ type NeenzaProblem = {
   constraints?: string[];
   follow_ups?: string[];
   hints?: string[];
-  code_snippets?: Record<string, string> | Array<{ langSlug?: string; code?: string }>;
+  code_snippets?:
+    | Record<string, string>
+    | Array<{ langSlug?: string; lang?: string; language?: string; code?: string }>;
   solutions?: string;
 };
 
@@ -149,22 +167,41 @@ function normalizeTopics(problem: NeenzaProblem) {
   return [];
 }
 
-function getCodeSnippet(problem: NeenzaProblem) {
+function normalizeSnippetEntries(problem: NeenzaProblem) {
   const snippets = problem.code_snippets;
 
   if (!snippets) {
-    return "";
+    return new Map<string, string>();
   }
 
   if (Array.isArray(snippets)) {
-    return (
-      snippets.find((snippet) => snippet.langSlug === "javascript")?.code ??
-      snippets.find((snippet) => snippet.langSlug === "typescript")?.code ??
-      ""
+    return new Map(
+      snippets
+        .map((snippet) => [snippet.langSlug ?? snippet.lang ?? snippet.language, snippet.code])
+        .filter(
+          (entry): entry is [string, string] => Boolean(entry[0]) && typeof entry[1] === "string",
+        ),
     );
   }
 
-  return snippets.javascript ?? snippets.typescript ?? "";
+  return new Map(Object.entries(snippets).filter(([, code]) => typeof code === "string"));
+}
+
+function getCodeSnippetsByLanguage(problem: NeenzaProblem) {
+  const snippets = normalizeSnippetEntries(problem);
+  const codeByLanguage: Problem["codeByLanguage"] = {};
+
+  for (const language of SUPPORTED_CODE_LANGUAGES) {
+    const snippet = SNIPPET_SLUGS_BY_LANGUAGE[language]
+      .map((slug) => snippets.get(slug))
+      .find((code): code is string => typeof code === "string" && Boolean(code.trim()));
+
+    if (snippet) {
+      codeByLanguage[language] = snippet;
+    }
+  }
+
+  return codeByLanguage;
 }
 
 function extractFunctionName(code: string, title: string) {
@@ -195,7 +232,7 @@ function extractFunctionName(code: string, title: string) {
 }
 
 function createStarterCode(problem: NeenzaProblem, title: string) {
-  const snippet = getCodeSnippet(problem).trim();
+  const snippet = (getCodeSnippetsByLanguage(problem).javascript ?? "").trim();
 
   if (snippet) {
     return snippet;
@@ -246,20 +283,40 @@ function parseExampleText(exampleText: string, id: string): TestCase | null {
     return null;
   }
 
-  return { id, input, expected };
+  return { id, input: normalizeTestInput(input), expected };
+}
+
+function normalizeTestInput(input: string) {
+  const lines = input
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length >= 2 && lines[0].startsWith("[") && lines[1].startsWith("[")) {
+    return `operations = ${lines[0]}, arguments = ${lines[1]}`;
+  }
+
+  return input;
+}
+
+function normalizeExampleList(examples: NeenzaProblem["examples"]) {
+  if (typeof examples === "string") {
+    return [{ example_num: 1, example_text: examples }];
+  }
+
+  if (Array.isArray(examples)) {
+    return examples;
+  }
+
+  if (examples && typeof examples === "object") {
+    return [examples as NeenzaExample];
+  }
+
+  return [];
 }
 
 function normalizeExamples(problem: NeenzaProblem, problemId: string) {
-  if (typeof problem.examples === "string") {
-    const testCase = parseExampleText(problem.examples, `${problemId}-case-1`);
-    return testCase ? [testCase] : [];
-  }
-
-  if (!Array.isArray(problem.examples)) {
-    return [];
-  }
-
-  return problem.examples
+  return normalizeExampleList(problem.examples)
     .map((example, index) =>
       parseExampleText(
         example.example_text ?? example.text ?? "",
@@ -274,16 +331,7 @@ function normalizeExampleMarkdownText(text: string) {
 }
 
 function getExampleMarkdownEntries(problem: NeenzaProblem) {
-  if (typeof problem.examples === "string") {
-    const text = normalizeExampleMarkdownText(problem.examples);
-    return text ? [{ number: 1, text }] : [];
-  }
-
-  if (!Array.isArray(problem.examples)) {
-    return [];
-  }
-
-  return problem.examples
+  return normalizeExampleList(problem.examples)
     .map((example, index) => ({
       number: example.example_num ?? index + 1,
       text: normalizeExampleMarkdownText(example.example_text ?? example.text ?? ""),
@@ -305,7 +353,10 @@ function stripConstraintsBlock(description: string) {
   );
 }
 
-function cleanDescriptionText(description: string, options: { stripExamples: boolean; stripConstraints: boolean }) {
+function cleanDescriptionText(
+  description: string,
+  options: { stripExamples: boolean; stripConstraints: boolean },
+) {
   let cleanDescription = description.replace(/\r\n/g, "\n").trim();
 
   if (options.stripExamples) {
@@ -320,9 +371,7 @@ function cleanDescriptionText(description: string, options: { stripExamples: boo
     cleanDescription = cleanDescription.replace(/^\s*Constraints\s*:?\s*$/gim, "");
   }
 
-  return cleanDescription
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return cleanDescription.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function buildExamplesMarkdown(problem: NeenzaProblem) {
@@ -353,11 +402,9 @@ function buildDescriptionMarkdown(problem: NeenzaProblem, title: string, number:
   parts.push(...examplesMarkdown);
 
   if (hasConstraints) {
-    parts.push(`## Constraints\n\n${constraints.map((constraint) => `- ${constraint}`).join("\n")}`);
-  }
-
-  if (Array.isArray(problem.hints) && problem.hints.length > 0) {
-    parts.push(`## Hints\n\n${problem.hints.map((hint) => `- ${hint}`).join("\n")}`);
+    parts.push(
+      `## Constraints\n\n${constraints.map((constraint) => `- ${constraint}`).join("\n")}`,
+    );
   }
 
   return parts.filter(Boolean).join("\n\n");
@@ -384,7 +431,19 @@ function problemFromNeenza(problem: NeenzaProblem): Problem | null {
 
   const id = `lc-${number}`;
   const code = createStarterCode(problem, title);
+  const codeByLanguage = getCodeSnippetsByLanguage(problem);
+  if (!codeByLanguage.javascript) {
+    codeByLanguage.javascript = code;
+  }
+  const missingCodeLanguages = SUPPORTED_CODE_LANGUAGES.filter(
+    (language) => !codeByLanguage[language],
+  );
   const topics = normalizeTopics(problem);
+  const hints = Array.isArray(problem.hints)
+    ? problem.hints.filter(
+        (hint): hint is string => typeof hint === "string" && Boolean(hint.trim()),
+      )
+    : [];
 
   const testCases = normalizeExamples(problem, id);
 
@@ -403,6 +462,10 @@ function problemFromNeenza(problem: NeenzaProblem): Problem | null {
     functionName: extractFunctionName(code, title),
     judgeMode: judgeModeFrom(problem),
     code,
+    activeLanguage: "javascript",
+    codeByLanguage,
+    missingCodeLanguages,
+    hints,
     testCases:
       testCases.length > 0 ? testCases : [{ id: `${id}-case-1`, input: "", expected: "undefined" }],
     submissions: [],
