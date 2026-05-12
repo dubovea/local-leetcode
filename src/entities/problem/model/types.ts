@@ -4,6 +4,10 @@ export type ProblemSource = "leetcode" | "manual";
 
 export type JudgeMode = "exact" | "unordered-array";
 
+export type CodeLanguage = "javascript" | "python-pyodide" | "c-wasm" | "cpp-wasm" | "go-wasm";
+
+export type ProblemCodeByLanguage = Partial<Record<CodeLanguage, string>>;
+
 export type TestCase = {
   id: string;
   input: string;
@@ -50,6 +54,7 @@ export type RunResult = {
 export type Submission = {
   id: string;
   submittedAt: string;
+  language?: CodeLanguage;
   status: Exclude<RunStatus, "idle" | "running">;
   runtimeMs: number;
   memoryBytes?: number;
@@ -71,7 +76,9 @@ export type Problem = {
   notesMarkdown?: string;
   functionName: string;
   judgeMode: JudgeMode;
+  activeLanguage?: CodeLanguage;
   code: string;
+  codeByLanguage?: ProblemCodeByLanguage;
   testCases: TestCase[];
   submissions: Submission[];
 };
@@ -101,6 +108,7 @@ export type ProblemCatalogItem = {
 
 export type RunRequest = {
   code: string;
+  language?: CodeLanguage;
   functionName: string;
   judgeMode: JudgeMode;
   testCases: TestCase[];

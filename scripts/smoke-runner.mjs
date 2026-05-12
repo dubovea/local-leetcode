@@ -1,4 +1,7 @@
-import { runUserCode, parseInputAssignments } from "../src/features/problem-runner/model/runnerCore.js";
+import {
+  runUserCode,
+  parseInputAssignments,
+} from "../src/features/problem-runner/model/runnerCore.js";
 
 function assert(condition, message) {
   if (!condition) {
@@ -76,6 +79,25 @@ const wrongAnswer = await runUserCode({
 
 assert(wrongAnswer.status === "wrong-answer", `expected wrong-answer, got ${wrongAnswer.status}`);
 
+const unsupportedWasmLanguage = await runUserCode({
+  code: "int groupAnagrams(void) { return 0; }",
+  language: "c-wasm",
+  functionName: "groupAnagrams",
+  judgeMode: "unordered-array",
+  testCases: [
+    {
+      id: "1",
+      input: 'strs =\n["eat","tea","tan","ate","nat","bat"]',
+      expected: '[["bat"],["nat","tan"],["ate","eat","tea"]]',
+    },
+  ],
+});
+
+assert(
+  unsupportedWasmLanguage.status === "runtime-error",
+  `expected runtime-error for unsupported WASM source, got ${unsupportedWasmLanguage.status}`,
+);
+
 const runtimeError = await runUserCode({
   code: "var groupAnagrams = function () { throw new Error('boom'); };",
   functionName: "groupAnagrams",
@@ -83,7 +105,10 @@ const runtimeError = await runUserCode({
   testCases: [{ id: "1", input: 'strs = ["a"]', expected: '[["a"]]' }],
 });
 
-assert(runtimeError.status === "runtime-error", `expected runtime-error, got ${runtimeError.status}`);
+assert(
+  runtimeError.status === "runtime-error",
+  `expected runtime-error, got ${runtimeError.status}`,
+);
 
 const delayedRuntimeError = await runUserCode({
   code: `var failSlow = function () {

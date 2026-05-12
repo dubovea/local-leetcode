@@ -1,6 +1,8 @@
 import Editor, { type OnMount } from "@monaco-editor/react";
 import { useEffect, useMemo, useRef } from "react";
 import type * as Monaco from "monaco-editor";
+import type { CodeLanguage } from "@/entities/problem/model/types";
+import { getCodeLanguageConfig } from "@/entities/problem/model/codeLanguages";
 import { formatJavaScript } from "@/shared/lib/formatJavaScript";
 
 const CODE_SAVE_DELAY_MS = 700;
@@ -9,6 +11,7 @@ type AppTheme = "dark" | "light";
 export function SolutionEditor({
   problemId,
   initialCode,
+  language,
   onChange,
   onDraftChange,
   onRun,
@@ -17,21 +20,29 @@ export function SolutionEditor({
 }: {
   problemId: string;
   initialCode: string;
+  language: CodeLanguage;
   resetKey: number;
   theme: AppTheme;
-  onChange: (problemId: string, code: string) => void;
-  onDraftChange: (problemId: string, code: string) => void;
+  onChange: (problemId: string, language: CodeLanguage, code: string) => void;
+  onDraftChange: (problemId: string, language: CodeLanguage, code: string) => void;
   onRun: () => void;
 }) {
+  const languageConfig = getCodeLanguageConfig(language);
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof Monaco | null>(null);
   const runRef = useRef(onRun);
   const changeRef = useRef(onChange);
   const draftChangeRef = useRef(onDraftChange);
   const saveTimerRef = useRef<number | null>(null);
-  const pendingSaveRef = useRef<{ problemId: string; code: string } | null>(null);
+  const pendingSaveRef = useRef<{
+    problemId: string;
+    language: CodeLanguage;
+    code: string;
+  } | null>(null);
   const problemIdRef = useRef(problemId);
+  const languageRef = useRef(language);
   const lastEditorProblemIdRef = useRef(problemId);
+  const lastEditorLanguageRef = useRef(language);
   const lastResetKeyRef = useRef(resetKey);
 
   useEffect(() => {
@@ -53,19 +64,20 @@ export function SolutionEditor({
   const flushCode = useMemo(() => {
     return (code: string) => {
       const currentProblemId = problemIdRef.current;
+      const currentLanguage = languageRef.current;
 
-      draftChangeRef.current(currentProblemId, code);
+      draftChangeRef.current(currentProblemId, currentLanguage, code);
 
       if (saveTimerRef.current) {
         window.clearTimeout(saveTimerRef.current);
       }
 
-      pendingSaveRef.current = { problemId: currentProblemId, code };
+      pendingSaveRef.current = { problemId: currentProblemId, language: currentLanguage, code };
       saveTimerRef.current = window.setTimeout(() => {
         const pendingSave = pendingSaveRef.current;
 
         if (pendingSave) {
-          changeRef.current(pendingSave.problemId, pendingSave.code);
+          changeRef.current(pendingSave.problemId, pendingSave.language, pendingSave.code);
           pendingSaveRef.current = null;
         }
       }, CODE_SAVE_DELAY_MS);
@@ -76,15 +88,17 @@ export function SolutionEditor({
     const editor = editorRef.current;
 
     problemIdRef.current = problemId;
+    languageRef.current = language;
 
     if (!editor) {
       return;
     }
 
     const problemChanged = lastEditorProblemIdRef.current !== problemId;
+    const languageChanged = lastEditorLanguageRef.current !== language;
     const resetRequested = lastResetKeyRef.current !== resetKey;
 
-    if (!problemChanged && !resetRequested) {
+    if (!problemChanged && !languageChanged && !resetRequested) {
       return;
     }
 
@@ -94,15 +108,34 @@ export function SolutionEditor({
     }
 
     if (pendingSaveRef.current) {
-      changeRef.current(pendingSaveRef.current.problemId, pendingSaveRef.current.code);
+      changeRef.current(
+        pendingSaveRef.current.problemId,
+        pendingSaveRef.current.language,
+        pendingSaveRef.current.code,
+      );
       pendingSaveRef.current = null;
     }
 
     editor.setValue(initialCode);
-    draftChangeRef.current(problemId, initialCode);
+    const model = editor.getModel();
+
+    if (model) {
+      monacoRef.current?.editor.setModelLanguage(model, languageConfig.monacoLanguage);
+      editor.updateOptions({ tabSize: languageConfig.tabSize });
+    }
+
+    draftChangeRef.current(problemId, language, initialCode);
     lastEditorProblemIdRef.current = problemId;
+    lastEditorLanguageRef.current = language;
     lastResetKeyRef.current = resetKey;
-  }, [initialCode, problemId, resetKey]);
+  }, [
+    initialCode,
+    language,
+    languageConfig.monacoLanguage,
+    languageConfig.tabSize,
+    problemId,
+    resetKey,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -112,13 +145,21 @@ export function SolutionEditor({
       }
 
       if (pendingSaveRef.current) {
-        changeRef.current(pendingSaveRef.current.problemId, pendingSaveRef.current.code);
+        changeRef.current(
+          pendingSaveRef.current.problemId,
+          pendingSaveRef.current.language,
+          pendingSaveRef.current.code,
+        );
         pendingSaveRef.current = null;
       }
     };
   }, []);
 
   const formatCode = async () => {
+    if (languageRef.current !== "javascript") {
+      return;
+    }
+
     try {
       const editor = editorRef.current;
       const formatted = await formatJavaScript(editor?.getValue() ?? initialCode);
@@ -130,8 +171,8 @@ export function SolutionEditor({
       pendingSaveRef.current = null;
 
       editor?.setValue(formatted);
-      draftChangeRef.current(problemIdRef.current, formatted);
-      changeRef.current(problemIdRef.current, formatted);
+      draftChangeRef.current(problemIdRef.current, languageRef.current, formatted);
+      changeRef.current(problemIdRef.current, languageRef.current, formatted);
     } catch (error) {
       console.error(error);
     }
@@ -164,6 +205,13 @@ export function SolutionEditor({
     });
     monaco.editor.setTheme(theme === "dark" ? "medikcode-dark" : "medikcode-light");
 
+    const model = editor.getModel();
+
+    if (model) {
+      monaco.editor.setModelLanguage(model, languageConfig.monacoLanguage);
+      editor.updateOptions({ tabSize: languageConfig.tabSize });
+    }
+
     monaco.languages.registerDocumentFormattingEditProvider("javascript", {
       async provideDocumentFormattingEdits(model: Monaco.editor.ITextModel) {
         const formatted = await formatJavaScript(model.getValue());
@@ -185,9 +233,10 @@ export function SolutionEditor({
 
   return (
     <Editor
-      defaultLanguage="javascript"
+      defaultLanguage={languageConfig.monacoLanguage}
       defaultValue={initialCode}
       height="100%"
+      language={languageConfig.monacoLanguage}
       onChange={(value) => flushCode(value ?? "")}
       onMount={handleMount}
       options={{
@@ -198,7 +247,7 @@ export function SolutionEditor({
         lineNumbersMinChars: 3,
         scrollBeyondLastLine: false,
         smoothScrolling: true,
-        tabSize: 2,
+        tabSize: languageConfig.tabSize,
         automaticLayout: true,
         wordWrap: "on",
         padding: { top: 12, bottom: 12 },
@@ -206,7 +255,7 @@ export function SolutionEditor({
         quickSuggestions: true,
         parameterHints: { enabled: true },
       }}
-      path={`problem-${problemId}.js`}
+      path={`problem-${problemId}.${languageConfig.extension}`}
     />
   );
 }

@@ -1,42 +1,25 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import Editor from "@monaco-editor/react";
 import type * as Monaco from "monaco-editor";
+import { Activity, Cpu, RotateCcw, Sparkles, Timer, Trash2 } from "lucide-react";
+import { Bar, CartesianGrid, Cell, ComposedChart, Line, XAxis, YAxis } from "recharts";
+import type { CodeLanguage, Submission } from "@/entities/problem/model/types";
 import {
-  Activity,
-  Cpu,
-  RotateCcw,
-  Sparkles,
-  Timer,
-  Trash2,
-} from "lucide-react";
-import {
-  Bar,
-  CartesianGrid,
-  Cell,
-  ComposedChart,
-  Line,
-  XAxis,
-  YAxis,
-} from "recharts";
-import type { Submission } from "@/entities/problem/model/types";
+  DEFAULT_CODE_LANGUAGE,
+  codeLanguageOptions,
+  getCodeLanguageConfig,
+  getCodeLanguageLabel,
+  isCodeLanguage,
+} from "@/entities/problem/model/codeLanguages";
 import { formatDateTime, formatMemory, formatRuntime } from "@/shared/lib/date";
 import { Button } from "@/shared/ui/button";
-import {
-  ChartContainer,
-  ChartTooltip,
-  type ChartConfig,
-} from "@/shared/ui/chart";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/shared/ui/select";
+import { ChartContainer, ChartTooltip, type ChartConfig } from "@/shared/ui/chart";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 import { StatusText } from "@/shared/ui/StatusText";
 
 type SortMode = "chronological" | "runtime" | "memory";
+type LanguageFilter = "all" | CodeLanguage;
 
 type PerformancePoint = {
   id: string;
@@ -45,6 +28,8 @@ type PerformancePoint = {
   runtimeMs: number;
   memoryBytes?: number;
   memoryKb: number | null;
+  language: CodeLanguage;
+  languageLabel: string;
   submittedAt: string;
 };
 
@@ -54,17 +39,29 @@ function isFiniteNumber(value: unknown): value is number {
 
 function getAcceptedPoints(submissions: Submission[]): PerformancePoint[] {
   return submissions
-    .map((submission, index) => ({
-      id: submission.id,
-      attemptNumber: index + 1,
-      label: `#${index + 1}`,
-      runtimeMs: submission.runtimeMs,
-      memoryBytes: submission.memoryBytes,
-      memoryKb: isFiniteNumber(submission.memoryBytes) ? submission.memoryBytes / 1024 : null,
-      status: submission.status,
-      submittedAt: submission.submittedAt,
-    }))
-    .filter((submission) => submission.status === "accepted" && isFiniteNumber(submission.runtimeMs));
+    .map((submission, index) => {
+      const language = getSubmissionLanguage(submission);
+
+      return {
+        id: submission.id,
+        attemptNumber: index + 1,
+        label: `#${index + 1}`,
+        runtimeMs: submission.runtimeMs,
+        memoryBytes: submission.memoryBytes,
+        memoryKb: isFiniteNumber(submission.memoryBytes) ? submission.memoryBytes / 1024 : null,
+        language,
+        languageLabel: getCodeLanguageLabel(language),
+        status: submission.status,
+        submittedAt: submission.submittedAt,
+      };
+    })
+    .filter(
+      (submission) => submission.status === "accepted" && isFiniteNumber(submission.runtimeMs),
+    );
+}
+
+function getSubmissionLanguage(submission: Submission): CodeLanguage {
+  return isCodeLanguage(submission.language) ? submission.language : DEFAULT_CODE_LANGUAGE;
 }
 
 function getBestPoint<T extends PerformancePoint>(
@@ -94,8 +91,12 @@ function sortPoints(points: PerformancePoint[], sortMode: SortMode) {
     }
 
     if (sortMode === "memory") {
-      const leftMemory = isFiniteNumber(left.memoryBytes) ? left.memoryBytes : Number.POSITIVE_INFINITY;
-      const rightMemory = isFiniteNumber(right.memoryBytes) ? right.memoryBytes : Number.POSITIVE_INFINITY;
+      const leftMemory = isFiniteNumber(left.memoryBytes)
+        ? left.memoryBytes
+        : Number.POSITIVE_INFINITY;
+      const rightMemory = isFiniteNumber(right.memoryBytes)
+        ? right.memoryBytes
+        : Number.POSITIVE_INFINITY;
 
       return leftMemory - rightMemory;
     }
@@ -107,9 +108,10 @@ function sortPoints(points: PerformancePoint[], sortMode: SortMode) {
 function getBestOverallPoint(points: PerformancePoint[]) {
   const memoryPoints = points.filter((point) => isFiniteNumber(point.memoryBytes));
   const maxRuntime = Math.max(...points.map((point) => point.runtimeMs), 1);
-  const maxMemory = memoryPoints.length > 0
-    ? Math.max(...memoryPoints.map((point) => point.memoryBytes ?? 0), 1)
-    : 1;
+  const maxMemory =
+    memoryPoints.length > 0
+      ? Math.max(...memoryPoints.map((point) => point.memoryBytes ?? 0), 1)
+      : 1;
 
   return points.reduce<PerformancePoint | null>((bestPoint, point) => {
     const score =
@@ -124,15 +126,7 @@ function getBestOverallPoint(points: PerformancePoint[]) {
   }, null);
 }
 
-function MetricPill({
-  icon,
-  label,
-  value,
-}: {
-  icon: ReactNode;
-  label: string;
-  value: string;
-}) {
+function MetricPill({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="inline-flex items-center gap-2 rounded-md border border-[var(--lc-border)] bg-[var(--lc-panel)] px-2.5 py-1.5">
       <span className="text-[var(--lc-muted)]">{icon}</span>
@@ -169,8 +163,9 @@ function PerformanceTooltip({
     <div className="min-w-52 rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-3 text-xs shadow-xl">
       <div className="mb-2 flex items-center justify-between gap-3">
         <div className="font-semibold text-[var(--lc-text-strong)]">Solution {point.label}</div>
-        <div className="text-[var(--lc-muted)]">{formatDateTime(point.submittedAt)}</div>
+        <div className="text-[var(--lc-muted)]">{point.languageLabel}</div>
       </div>
+      <div className="mb-2 text-[var(--lc-muted)]">{formatDateTime(point.submittedAt)}</div>
 
       <div className="grid gap-1.5">
         <div className="flex items-center justify-between gap-4">
@@ -222,16 +217,15 @@ const chartConfig = {
 function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
   const [sortMode, setSortMode] = useState<SortMode>("chronological");
   const points = useMemo(() => getAcceptedPoints(submissions), [submissions]);
-
-  if (points.length === 0) {
-    return null;
-  }
-
   const memoryPoints = points.filter((point) => isFiniteNumber(point.memoryBytes));
   const bestRuntimePoint = getBestPoint(points, (point) => point.runtimeMs);
   const bestMemoryPoint = getBestPoint(memoryPoints, (point) => point.memoryBytes);
   const bestOverallPoint = getBestOverallPoint(points);
   const sortedPoints = useMemo(() => sortPoints(points, sortMode), [points, sortMode]);
+
+  if (points.length === 0) {
+    return null;
+  }
 
   return (
     <section className="rounded-xl border border-[var(--lc-border)] bg-[var(--lc-panel-raised)]">
@@ -280,22 +274,14 @@ function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
       </header>
 
       <div className="px-4 py-4">
-        <ChartContainer
-          className="h-64 w-full aspect-auto"
-          config={chartConfig}
-        >
+        <ChartContainer className="h-64 w-full aspect-auto" config={chartConfig}>
           <ComposedChart
             accessibilityLayer
             data={sortedPoints}
             margin={{ top: 12, right: 12, bottom: 8, left: 4 }}
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
-            <XAxis
-              axisLine={false}
-              dataKey="label"
-              tickLine={false}
-              tickMargin={8}
-            />
+            <XAxis axisLine={false} dataKey="label" tickLine={false} tickMargin={8} />
             <YAxis
               axisLine={false}
               tickFormatter={(value) => formatRuntime(Number(value))}
@@ -400,13 +386,24 @@ function codeHeight(code: string) {
   return Math.min(360, Math.max(170, lineCount * 20 + 22));
 }
 
-function SolutionCodeBlock({ code, submissionId }: { code: string; submissionId: string }) {
+function SolutionCodeBlock({
+  code,
+  language,
+  submissionId,
+}: {
+  code: string;
+  language: CodeLanguage;
+  submissionId: string;
+}) {
+  const languageConfig = getCodeLanguageConfig(language);
+
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-code)]">
       <Editor
         beforeMount={defineSolutionThemes}
-        defaultLanguage="javascript"
+        defaultLanguage={languageConfig.monacoLanguage}
         height={codeHeight(code)}
+        language={languageConfig.monacoLanguage}
         options={{
           automaticLayout: true,
           contextmenu: false,
@@ -429,7 +426,7 @@ function SolutionCodeBlock({ code, submissionId }: { code: string; submissionId:
           },
           wordWrap: "on",
         }}
-        path={`submission-${submissionId}.js`}
+        path={`submission-${submissionId}.${languageConfig.extension}`}
         theme={
           document.documentElement.dataset.theme === "light"
             ? "medikcode-solution-light"
@@ -450,6 +447,29 @@ export function SolutionsHistory({
   onRestore: (submissionId: string) => void;
   onDelete: (submissionId: string) => void;
 }) {
+  const [languageFilter, setLanguageFilter] = useState<LanguageFilter>("all");
+  const availableLanguageOptions = useMemo(() => {
+    const languages = new Set(submissions.map(getSubmissionLanguage));
+
+    return codeLanguageOptions.filter((option) => languages.has(option.value));
+  }, [submissions]);
+  const visibleSubmissions = useMemo(() => {
+    if (languageFilter === "all") {
+      return submissions;
+    }
+
+    return submissions.filter((submission) => getSubmissionLanguage(submission) === languageFilter);
+  }, [languageFilter, submissions]);
+
+  useEffect(() => {
+    if (
+      languageFilter !== "all" &&
+      !submissions.some((submission) => getSubmissionLanguage(submission) === languageFilter)
+    ) {
+      setLanguageFilter("all");
+    }
+  }, [languageFilter, submissions]);
+
   if (submissions.length === 0) {
     return (
       <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--lc-border-strong)] bg-[var(--lc-panel-raised)] p-8 text-center text-sm text-[var(--lc-muted)]">
@@ -460,84 +480,122 @@ export function SolutionsHistory({
 
   return (
     <div className="space-y-3">
-      <SolutionsPerformance submissions={submissions} />
-
-      {[...submissions].reverse().map((submission, index) => (
-        <article
-          key={submission.id}
-          className="rounded-xl border border-[var(--lc-border)] bg-[var(--lc-panel-raised)]"
+      <div className="flex justify-end">
+        <Select
+          value={languageFilter}
+          onValueChange={(value) => setLanguageFilter(value as LanguageFilter)}
         >
-          <header className="flex items-center justify-between gap-3 border-b border-[var(--lc-border)] px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3">
-              <StatusText status={submission.status} />
-              <span className="text-xs text-[var(--lc-muted)]">#{submissions.length - index}</span>
-              <span className="truncate text-xs text-[var(--lc-muted)]">
-                {formatDateTime(submission.submittedAt)}
-              </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-2 text-xs text-[var(--lc-muted)]">
-              <span>{formatRuntime(submission.runtimeMs)}</span>
-              {submission.status === "accepted" ? (
-                <span title="Estimated memory">{formatMemory(submission.memoryBytes)}</span>
-              ) : null}
-              <Button
-                className="h-8 px-2 text-xs"
-                title="Restore this code to editor"
-                variant="ghost"
-                onClick={() => onRestore(submission.id)}
-              >
-                <RotateCcw className="h-4 w-4" />
-                Restore
-              </Button>
-              <Button
-                aria-label="Delete this submission"
-                className="h-8 px-2 text-xs"
-                title="Delete this submission"
-                variant="ghost"
-                onClick={() => onDelete(submission.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </header>
+          <SelectTrigger className="h-8 w-48 bg-[var(--lc-panel)] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-[var(--lc-panel-raised)]">
+            <SelectItem value="all">All languages</SelectItem>
+            {availableLanguageOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-          {submission.errorText ? (
-            <pre className="m-4 max-h-44 overflow-auto rounded-lg bg-[var(--lc-danger-soft)] p-3 text-xs text-[var(--lc-danger-text)]">
-              {submission.errorText}
-            </pre>
-          ) : null}
+      <SolutionsPerformance submissions={visibleSubmissions} />
 
-          <div className="px-4 py-3">
-            <div className="mb-2 flex items-center gap-3 text-xs text-[var(--lc-muted)]">
-              <span className="font-semibold">Cases</span>
-              <span>
-                {submission.cases.filter((testCase) => testCase.passed).length}/
-                {submission.cases.length} passed
-              </span>
-            </div>
-            <div className="mb-3 flex flex-wrap gap-2">
-              {submission.cases.map((testCase, caseIndex) => (
-                <span
-                  key={testCase.id}
-                  className="inline-flex items-center gap-1 rounded-md bg-[var(--lc-code)] px-2 py-1 text-xs text-[var(--lc-text)]"
-                >
-                  <span
-                    className={
-                      testCase.passed
-                        ? "h-2 w-2 rounded-full bg-[var(--lc-success)]"
-                        : "h-2 w-2 rounded-full bg-[var(--lc-danger-strong)]"
-                    }
-                  />
-                  Case {caseIndex + 1}
+      {visibleSubmissions.length === 0 ? (
+        <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-[var(--lc-border-strong)] bg-[var(--lc-panel-raised)] p-8 text-center text-sm text-[var(--lc-muted)]">
+          No submissions for this language yet.
+        </div>
+      ) : null}
+
+      {[...visibleSubmissions].reverse().map((submission, index) => {
+        const language = getSubmissionLanguage(submission);
+
+        return (
+          <article
+            key={submission.id}
+            className="rounded-xl border border-[var(--lc-border)] bg-[var(--lc-panel-raised)]"
+          >
+            <header className="flex items-center justify-between gap-3 border-b border-[var(--lc-border)] px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <StatusText status={submission.status} />
+                <span className="text-xs text-[var(--lc-muted)]">
+                  #{visibleSubmissions.length - index}
                 </span>
-              ))}
-            </div>
+                <span className="rounded-md bg-[var(--lc-code)] px-2 py-1 text-xs font-medium text-[var(--lc-text)]">
+                  {getCodeLanguageLabel(language)}
+                </span>
+                <span className="truncate text-xs text-[var(--lc-muted)]">
+                  {formatDateTime(submission.submittedAt)}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2 text-xs text-[var(--lc-muted)]">
+                <span>{formatRuntime(submission.runtimeMs)}</span>
+                {submission.status === "accepted" ? (
+                  <span title="Estimated memory">{formatMemory(submission.memoryBytes)}</span>
+                ) : null}
+                <Button
+                  className="h-8 px-2 text-xs"
+                  title="Restore this code to editor"
+                  variant="ghost"
+                  onClick={() => onRestore(submission.id)}
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Restore
+                </Button>
+                <Button
+                  aria-label="Delete this submission"
+                  className="h-8 px-2 text-xs"
+                  title="Delete this submission"
+                  variant="ghost"
+                  onClick={() => onDelete(submission.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </header>
 
-            <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">Code</div>
-            <SolutionCodeBlock code={submission.code} submissionId={submission.id} />
-          </div>
-        </article>
-      ))}
+            {submission.errorText ? (
+              <pre className="m-4 max-h-44 overflow-auto rounded-lg bg-[var(--lc-danger-soft)] p-3 text-xs text-[var(--lc-danger-text)]">
+                {submission.errorText}
+              </pre>
+            ) : null}
+
+            <div className="px-4 py-3">
+              <div className="mb-2 flex items-center gap-3 text-xs text-[var(--lc-muted)]">
+                <span className="font-semibold">Cases</span>
+                <span>
+                  {submission.cases.filter((testCase) => testCase.passed).length}/
+                  {submission.cases.length} passed
+                </span>
+              </div>
+              <div className="mb-3 flex flex-wrap gap-2">
+                {submission.cases.map((testCase, caseIndex) => (
+                  <span
+                    key={testCase.id}
+                    className="inline-flex items-center gap-1 rounded-md bg-[var(--lc-code)] px-2 py-1 text-xs text-[var(--lc-text)]"
+                  >
+                    <span
+                      className={
+                        testCase.passed
+                          ? "h-2 w-2 rounded-full bg-[var(--lc-success)]"
+                          : "h-2 w-2 rounded-full bg-[var(--lc-danger-strong)]"
+                      }
+                    />
+                    Case {caseIndex + 1}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">Code</div>
+              <SolutionCodeBlock
+                code={submission.code}
+                language={language}
+                submissionId={submission.id}
+              />
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
+  CodeLanguage,
   Problem,
   ProblemsBackup,
   RunResult,
@@ -7,6 +8,7 @@ import type {
   Submission,
 } from "@/entities/problem/model/types";
 import { useProblemStore } from "@/entities/problem/model/problemStore";
+import { DEFAULT_CODE_LANGUAGE, getProblemCode } from "@/entities/problem/model/codeLanguages";
 import { runInWorker } from "@/features/problem-runner/model/runInWorker";
 import { createId } from "@/shared/lib/id";
 import { Button } from "@/shared/ui/button";
@@ -26,12 +28,13 @@ function getInitialTheme(): AppTheme {
   return storedTheme === "light" ? "light" : "dark";
 }
 
-function resultToSubmission(result: RunResult, code: string): Submission {
+function resultToSubmission(result: RunResult, code: string, language: CodeLanguage): Submission {
   const status = result.status as Exclude<RunStatus, "idle" | "running">;
 
   return {
     id: createId("submission"),
     submittedAt: new Date().toISOString(),
+    language,
     status,
     runtimeMs: result.durationMs,
     memoryBytes: status === "accepted" ? result.memoryBytes : undefined,
@@ -69,7 +72,8 @@ export function ProblemPage() {
   const [lastResult, setLastResult] = useState<RunResult | null>(null);
   const [editorResetKey, setEditorResetKey] = useState(0);
   const [theme, setTheme] = useState<AppTheme>(getInitialTheme);
-  const latestCodeRef = useRef("");
+  const [activeLanguage, setActiveLanguage] = useState<CodeLanguage>(DEFAULT_CODE_LANGUAGE);
+  const latestCodeByLanguageRef = useRef<Partial<Record<CodeLanguage, string>>>({});
 
   useEffect(() => {
     void initialize();
@@ -85,7 +89,15 @@ export function ProblemPage() {
       return;
     }
 
-    latestCodeRef.current = activeProblem.code;
+    const nextLanguage = activeProblem.activeLanguage ?? DEFAULT_CODE_LANGUAGE;
+
+    latestCodeByLanguageRef.current = {
+      ...(activeProblem.codeByLanguage ?? {}),
+      [DEFAULT_CODE_LANGUAGE]:
+        activeProblem.codeByLanguage?.[DEFAULT_CODE_LANGUAGE] ?? activeProblem.code,
+      [nextLanguage]: getProblemCode(activeProblem, nextLanguage),
+    };
+    setActiveLanguage(nextLanguage);
     setActiveCaseId(activeProblem.testCases[0]?.id);
     setLastResult(null);
     setBottomTab("testcase");
@@ -97,7 +109,9 @@ export function ProblemPage() {
         return;
       }
 
-      const code = latestCodeRef.current || activeProblem.code;
+      const code =
+        latestCodeByLanguageRef.current[activeLanguage] ??
+        getProblemCode(activeProblem, activeLanguage);
       const testCases = activeProblem.testCases;
 
       if (testCases.length === 0) {
@@ -109,6 +123,7 @@ export function ProblemPage() {
 
       const result = await runInWorker({
         code,
+        language: activeLanguage,
         functionName: activeProblem.functionName,
         judgeMode: activeProblem.judgeMode,
         testCases,
@@ -117,14 +132,18 @@ export function ProblemPage() {
       setLastResult(result);
 
       if (saveSubmission) {
-        await addSubmission(activeProblem.id, resultToSubmission(result, code), code);
+        await addSubmission(
+          activeProblem.id,
+          resultToSubmission(result, code, activeLanguage),
+          code,
+        );
       } else {
-        void saveProblemCode(activeProblem.id, code);
+        void saveProblemCode(activeProblem.id, activeLanguage, code);
       }
 
       setRunning(false);
     },
-    [activeProblem, addSubmission, running, saveProblemCode],
+    [activeLanguage, activeProblem, addSubmission, running, saveProblemCode],
   );
 
   async function handleSelectProblem(problemId: string) {
@@ -132,14 +151,47 @@ export function ProblemPage() {
     setDrawerOpen(false);
   }
 
-  function handleCodeDraftChange(problemId: string, code: string) {
+  function handleCodeDraftChange(problemId: string, language: CodeLanguage, code: string) {
     if (problemId === activeProblemId) {
-      latestCodeRef.current = code;
+      latestCodeByLanguageRef.current = {
+        ...latestCodeByLanguageRef.current,
+        [language]: code,
+      };
     }
   }
 
-  async function handleCodeChange(problemId: string, code: string) {
-    await saveProblemCode(problemId, code);
+  async function handleCodeChange(problemId: string, language: CodeLanguage, code: string) {
+    await saveProblemCode(problemId, language, code);
+  }
+
+  async function handleLanguageChange(language: CodeLanguage) {
+    if (!activeProblem || language === activeLanguage) {
+      return;
+    }
+
+    const currentCode =
+      latestCodeByLanguageRef.current[activeLanguage] ??
+      getProblemCode(activeProblem, activeLanguage);
+    const nextCode =
+      latestCodeByLanguageRef.current[language] ?? getProblemCode(activeProblem, language);
+    const codeByLanguage = {
+      ...(activeProblem.codeByLanguage ?? {}),
+      ...latestCodeByLanguageRef.current,
+      [activeLanguage]: currentCode,
+      [language]: nextCode,
+    };
+
+    latestCodeByLanguageRef.current = codeByLanguage;
+    setActiveLanguage(language);
+    setLastResult(null);
+    setEditorResetKey((value) => value + 1);
+
+    await updateActiveProblem({
+      ...activeProblem,
+      activeLanguage: language,
+      code: nextCode,
+      codeByLanguage,
+    });
   }
 
   async function handleRestoreSubmission(submissionId: string) {
@@ -147,13 +199,17 @@ export function ProblemPage() {
       return;
     }
 
-    const restoredCode = await restoreSubmissionCode(activeProblem.id, submissionId);
+    const restored = await restoreSubmissionCode(activeProblem.id, submissionId);
 
-    if (restoredCode === null) {
+    if (restored === null) {
       return;
     }
 
-    latestCodeRef.current = restoredCode;
+    latestCodeByLanguageRef.current = {
+      ...latestCodeByLanguageRef.current,
+      [restored.language]: restored.code,
+    };
+    setActiveLanguage(restored.language);
     setEditorResetKey((value) => value + 1);
   }
 
@@ -167,8 +223,25 @@ export function ProblemPage() {
 
   async function handleProblemChange(problem: Problem) {
     const code =
-      problem.id === activeProblemId ? latestCodeRef.current || problem.code : problem.code;
-    await updateActiveProblem({ ...problem, code });
+      problem.id === activeProblemId
+        ? (latestCodeByLanguageRef.current[activeLanguage] ??
+          getProblemCode(problem, activeLanguage))
+        : problem.code;
+    const codeByLanguage =
+      problem.id === activeProblemId
+        ? {
+            ...(problem.codeByLanguage ?? {}),
+            ...latestCodeByLanguageRef.current,
+            [activeLanguage]: code,
+          }
+        : problem.codeByLanguage;
+
+    await updateActiveProblem({
+      ...problem,
+      activeLanguage: problem.id === activeProblemId ? activeLanguage : problem.activeLanguage,
+      code,
+      codeByLanguage,
+    });
   }
 
   async function handleImportBackup(backup: ProblemsBackup | Problem[]) {
@@ -305,15 +378,23 @@ export function ProblemPage() {
         <CodeWorkspace
           activeCaseId={activeCaseId}
           bottomTab={bottomTab}
+          code={
+            latestCodeByLanguageRef.current[activeLanguage] ??
+            getProblemCode(activeProblem, activeLanguage)
+          }
           editorResetKey={editorResetKey}
+          language={activeLanguage}
           problem={activeProblem}
           result={lastResult}
           theme={theme}
           onActiveCaseChange={setActiveCaseId}
           onBottomTabChange={setBottomTab}
+          onLanguageChange={(language) => void handleLanguageChange(language)}
           onProblemChange={(problem) => void handleProblemChange(problem)}
           onCodeDraftChange={handleCodeDraftChange}
-          onCodeChange={(problemId, code) => void handleCodeChange(problemId, code)}
+          onCodeChange={(problemId, language, code) =>
+            void handleCodeChange(problemId, language, code)
+          }
           onRun={() => void execute(false)}
         />
       </main>

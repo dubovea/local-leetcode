@@ -1,15 +1,19 @@
 import { CheckSquare, Code2, FileText } from "lucide-react";
-import type { Problem, RunResult, TestCase } from "@/entities/problem/model/types";
+import type { CodeLanguage, Problem, RunResult, TestCase } from "@/entities/problem/model/types";
+import { codeLanguageOptions } from "@/entities/problem/model/codeLanguages";
 import { SolutionEditor } from "@/features/problem-editor/ui/SolutionEditor";
 import { TestcaseEditor } from "@/features/testcases/ui/TestcaseEditor";
 import { TestResultPanel } from "@/widgets/test-result-panel/ui/TestResultPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 type BottomTab = "testcase" | "result";
 type AppTheme = "dark" | "light";
 
 export function CodeWorkspace({
   problem,
+  code,
+  language,
   result,
   bottomTab,
   activeCaseId,
@@ -17,12 +21,15 @@ export function CodeWorkspace({
   theme,
   onBottomTabChange,
   onActiveCaseChange,
+  onLanguageChange,
   onProblemChange,
   onCodeChange,
   onCodeDraftChange,
   onRun,
 }: {
   problem: Problem;
+  code: string;
+  language: CodeLanguage;
   result: RunResult | null;
   bottomTab: BottomTab;
   activeCaseId?: string;
@@ -30,9 +37,10 @@ export function CodeWorkspace({
   theme: AppTheme;
   onBottomTabChange: (tab: BottomTab) => void;
   onActiveCaseChange: (id: string) => void;
+  onLanguageChange: (language: CodeLanguage) => void;
   onProblemChange: (problem: Problem) => void;
-  onCodeChange: (problemId: string, code: string) => void;
-  onCodeDraftChange: (problemId: string, code: string) => void;
+  onCodeChange: (problemId: string, language: CodeLanguage, code: string) => void;
+  onCodeDraftChange: (problemId: string, language: CodeLanguage, code: string) => void;
   onRun: () => void;
 }) {
   function updateTestCases(testCases: TestCase[]) {
@@ -47,10 +55,30 @@ export function CodeWorkspace({
             <Code2 className="h-4 w-4 text-[var(--lc-success)]" />
             Code
           </div>
+          <Select
+            value={language}
+            onValueChange={(value) => onLanguageChange(value as CodeLanguage)}
+          >
+            <SelectTrigger
+              aria-label="Code language"
+              className="h-8 w-44 border-[var(--lc-border)] bg-[var(--lc-panel)] text-xs text-[var(--lc-text-strong)]"
+              title="Code language"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="bg-[var(--lc-panel-raised)]">
+              {codeLanguageOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="h-[calc(100%-44px)]">
           <SolutionEditor
-            initialCode={problem.code}
+            initialCode={code}
+            language={language}
             problemId={problem.id}
             resetKey={editorResetKey}
             theme={theme}
@@ -63,10 +91,7 @@ export function CodeWorkspace({
 
       <div className="min-h-0 overflow-hidden rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)]">
         <div className="flex h-11 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
-          <Tabs
-            value={bottomTab}
-            onValueChange={(value) => onBottomTabChange(value as BottomTab)}
-          >
+          <Tabs value={bottomTab} onValueChange={(value) => onBottomTabChange(value as BottomTab)}>
             <TabsList className="h-8 bg-transparent p-0" variant="line">
               <TabsTrigger
                 className="h-8 rounded-md px-3 text-xs text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"

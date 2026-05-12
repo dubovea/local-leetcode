@@ -1,4 +1,10 @@
 const ASSIGNMENT_START_RE = /^[A-Za-z_$][\w$]*\s*=/;
+const DEFAULT_LANGUAGE = "javascript";
+const PYODIDE_INDEX_URL = "https://cdn.jsdelivr.net/pyodide/v0.29.4/full/";
+const PYODIDE_MODULE_URL = `${PYODIDE_INDEX_URL}pyodide.mjs`;
+
+let pyodidePromise;
+let pythonLogsTarget = null;
 
 function nowMs() {
   if (typeof performance !== "undefined" && typeof performance.now === "function") {
@@ -299,7 +305,10 @@ function normalizeUnorderedArray(value) {
 
 function compareValues(output, expected, judgeMode) {
   if (judgeMode === "unordered-array") {
-    return stringifyValue(normalizeUnorderedArray(output)) === stringifyValue(normalizeUnorderedArray(expected));
+    return (
+      stringifyValue(normalizeUnorderedArray(output)) ===
+      stringifyValue(normalizeUnorderedArray(expected))
+    );
   }
 
   return stringifyValue(stableObject(output)) === stringifyValue(stableObject(expected));
@@ -334,6 +343,29 @@ function createConsole(logs) {
   }, {});
 }
 
+async function getPyodideRuntime() {
+  if (!pyodidePromise) {
+    pyodidePromise = import(/* @vite-ignore */ PYODIDE_MODULE_URL)
+      .then(({ loadPyodide }) =>
+        loadPyodide({
+          indexURL: PYODIDE_INDEX_URL,
+          stdout: (text) => {
+            pythonLogsTarget?.push({ type: "log", text });
+          },
+          stderr: (text) => {
+            pythonLogsTarget?.push({ type: "error", text });
+          },
+        }),
+      )
+      .catch((error) => {
+        pyodidePromise = null;
+        throw new Error(`Failed to load Python (Pyodide) runtime: ${formatError(error)}`);
+      });
+  }
+
+  return pyodidePromise;
+}
+
 function compileUserCode(code, functionName, consoleApi) {
   const factory = Function(
     "console",
@@ -349,7 +381,56 @@ function compileUserCode(code, functionName, consoleApi) {
   return solution;
 }
 
-export async function runUserCode(request) {
+function destroyPyProxy(value) {
+  if (value && typeof value.destroy === "function") {
+    value.destroy();
+  }
+}
+
+function pythonValueToJs(value) {
+  if (value && typeof value.toJs === "function") {
+    return value.toJs({ dict_converter: Object.fromEntries });
+  }
+
+  return value;
+}
+
+async function compilePythonCode(code, functionName) {
+  const pyodide = await getPyodideRuntime();
+  const globals = pyodide.toPy({});
+
+  try {
+    pyodide.runPython(code, { globals });
+
+    const solution = pyodide.runPython(functionName, { globals });
+
+    if (typeof solution !== "function") {
+      destroyPyProxy(solution);
+      throw new Error(`Function "${functionName}" was not found`);
+    }
+
+    return { pyodide, globals, solution };
+  } catch (error) {
+    destroyPyProxy(globals);
+    throw error;
+  }
+}
+
+function unsupportedWasmLanguageResult(request) {
+  return {
+    ok: false,
+    status: "runtime-error",
+    durationMs: 0,
+    passedCount: 0,
+    totalCount: request.testCases.length,
+    cases: [],
+    logs: [],
+    errorText:
+      "C/C++/Go source editing is enabled, but compiling arbitrary source to WASM is not wired yet. Use JavaScript or Python (Pyodide) for executable runs.",
+  };
+}
+
+async function runJavaScriptUserCode(request) {
   const logs = [];
   const totalStartedAt = nowMs();
   const consoleApi = createConsole(logs);
@@ -429,4 +510,124 @@ export async function runUserCode(request) {
     cases,
     logs,
   };
+}
+
+async function runPythonUserCode(request) {
+  const logs = [];
+  const totalStartedAt = nowMs();
+  const cases = [];
+
+  let compiled;
+
+  pythonLogsTarget = logs;
+
+  try {
+    compiled = await compilePythonCode(request.code, request.functionName);
+  } catch (error) {
+    pythonLogsTarget = null;
+
+    return {
+      ok: false,
+      status: "runtime-error",
+      durationMs: nowMs() - totalStartedAt,
+      passedCount: 0,
+      totalCount: request.testCases.length,
+      cases,
+      logs,
+      errorText: formatError(error),
+    };
+  }
+
+  try {
+    for (let index = 0; index < request.testCases.length; index += 1) {
+      const testCase = request.testCases[index];
+      let durationMs = 0;
+      let solutionStartedAt;
+      let outputProxy;
+      const args = [];
+
+      try {
+        const parsedInput = parseInputAssignments(testCase.input);
+        const expected = evaluateLiteral(testCase.expected);
+
+        for (const value of parsedInput.values) {
+          args.push(compiled.pyodide.toPy(value));
+        }
+
+        const memoryStartedBytes = await readMemoryBytes();
+        solutionStartedAt = nowMs();
+        outputProxy = compiled.solution(...args);
+        durationMs = nowMs() - solutionStartedAt;
+
+        const output = pythonValueToJs(outputProxy);
+        const memoryBytes = await measureMemoryBytes(memoryStartedBytes, output);
+        const passed = compareValues(output, expected, request.judgeMode);
+
+        cases.push({
+          id: testCase.id,
+          name: `Case ${index + 1}`,
+          passed,
+          durationMs,
+          memoryBytes,
+          inputText: testCase.input,
+          outputText: stringifyValue(output),
+          expectedText: stringifyValue(expected),
+        });
+      } catch (error) {
+        if (typeof solutionStartedAt === "number") {
+          durationMs = nowMs() - solutionStartedAt;
+        }
+
+        cases.push({
+          id: testCase.id,
+          name: `Case ${index + 1}`,
+          passed: false,
+          durationMs,
+          inputText: testCase.input,
+          outputText: "",
+          expectedText: cleanValueText(testCase.expected),
+          errorText: formatError(error),
+        });
+      } finally {
+        destroyPyProxy(outputProxy);
+
+        for (const arg of args) {
+          destroyPyProxy(arg);
+        }
+      }
+    }
+  } finally {
+    pythonLogsTarget = null;
+    destroyPyProxy(compiled.solution);
+    destroyPyProxy(compiled.globals);
+  }
+
+  const passedCount = cases.filter((testCase) => testCase.passed).length;
+  const hasRuntimeError = cases.some((testCase) => testCase.errorText);
+  const ok = passedCount === request.testCases.length;
+
+  return {
+    ok,
+    status: ok ? "accepted" : hasRuntimeError ? "runtime-error" : "wrong-answer",
+    durationMs: cases.reduce((total, testCase) => total + testCase.durationMs, 0),
+    memoryBytes: ok ? maxCaseMemoryBytes(cases) : undefined,
+    passedCount,
+    totalCount: request.testCases.length,
+    cases,
+    logs,
+  };
+}
+
+export async function runUserCode(request) {
+  const language = request.language ?? DEFAULT_LANGUAGE;
+
+  if (language === "python-pyodide") {
+    return runPythonUserCode(request);
+  }
+
+  if (language !== DEFAULT_LANGUAGE) {
+    return unsupportedWasmLanguageResult(request);
+  }
+
+  return runJavaScriptUserCode(request);
 }

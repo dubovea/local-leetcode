@@ -1,0 +1,104 @@
+import type { CodeLanguage, Problem } from "./types";
+
+export const DEFAULT_CODE_LANGUAGE: CodeLanguage = "javascript";
+
+export const codeLanguageOptions: Array<{
+  value: CodeLanguage;
+  label: string;
+  monacoLanguage: string;
+  extension: string;
+  tabSize: number;
+}> = [
+  {
+    value: "javascript",
+    label: "JavaScript",
+    monacoLanguage: "javascript",
+    extension: "js",
+    tabSize: 2,
+  },
+  {
+    value: "python-pyodide",
+    label: "Python (Pyodide)",
+    monacoLanguage: "python",
+    extension: "py",
+    tabSize: 4,
+  },
+  {
+    value: "c-wasm",
+    label: "C (WASM)",
+    monacoLanguage: "c",
+    extension: "c",
+    tabSize: 4,
+  },
+  {
+    value: "cpp-wasm",
+    label: "C++ (WASM)",
+    monacoLanguage: "cpp",
+    extension: "cpp",
+    tabSize: 4,
+  },
+  {
+    value: "go-wasm",
+    label: "Go (WASM)",
+    monacoLanguage: "go",
+    extension: "go",
+    tabSize: 4,
+  },
+];
+
+const languageConfigByValue = new Map(
+  codeLanguageOptions.map((language) => [language.value, language]),
+);
+
+export function isCodeLanguage(value: unknown): value is CodeLanguage {
+  return typeof value === "string" && languageConfigByValue.has(value as CodeLanguage);
+}
+
+export function getCodeLanguageConfig(language: CodeLanguage) {
+  return languageConfigByValue.get(language) ?? codeLanguageOptions[0];
+}
+
+export function getCodeLanguageLabel(language?: CodeLanguage) {
+  return getCodeLanguageConfig(isCodeLanguage(language) ? language : DEFAULT_CODE_LANGUAGE).label;
+}
+
+function extractParameterNames(inputText?: string) {
+  const matches = String(inputText ?? "").matchAll(/(?:^|[\s,;])([A-Za-z_]\w*)\s*=/g);
+
+  return Array.from(matches, (match) => match[1]);
+}
+
+function getProblemParameters(problem: Problem) {
+  return extractParameterNames(problem.testCases[0]?.input);
+}
+
+export function getStarterCodeForLanguage(problem: Problem, language: CodeLanguage) {
+  const functionName = problem.functionName || "solution";
+  const parameters = getProblemParameters(problem);
+
+  if (language === "python-pyodide") {
+    return `def ${functionName}(${parameters.length > 0 ? parameters.join(", ") : "*args"}):\n    return None\n`;
+  }
+
+  if (language === "cpp-wasm") {
+    return `#include <vector>\nusing namespace std;\n\nauto ${functionName}() {\n    return 0;\n}\n`;
+  }
+
+  if (language === "c-wasm") {
+    return `int ${functionName}(void) {\n    return 0;\n}\n`;
+  }
+
+  if (language === "go-wasm") {
+    return `package main\n\nfunc ${functionName}() any {\n    return nil\n}\n`;
+  }
+
+  return problem.code;
+}
+
+export function getProblemCode(problem: Problem, language: CodeLanguage) {
+  return (
+    problem.codeByLanguage?.[language] ??
+    (language === DEFAULT_CODE_LANGUAGE ? problem.code : undefined) ??
+    getStarterCodeForLanguage(problem, language)
+  );
+}

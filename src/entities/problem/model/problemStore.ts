@@ -3,6 +3,13 @@ import { defaultProblems } from "./defaultProblems";
 import { generatedNeenzaProblems } from "./generatedNeenzaProblems";
 import { generatedPatternProblems } from "./generatedPatternProblems";
 import {
+  DEFAULT_CODE_LANGUAGE,
+  codeLanguageOptions,
+  getProblemCode,
+  getStarterCodeForLanguage,
+  isCodeLanguage,
+} from "./codeLanguages";
+import {
   clearProblemsDb,
   deleteProblemFromDb,
   getAllProblemsFromDb,
@@ -14,7 +21,14 @@ import {
   sortProblemIndex,
   toProblemListItem,
 } from "./problemDb";
-import type { Problem, ProblemListItem, ProblemsBackup, Submission } from "./types";
+import type {
+  CodeLanguage,
+  Problem,
+  ProblemCodeByLanguage,
+  ProblemListItem,
+  ProblemsBackup,
+  Submission,
+} from "./types";
 
 const LEGACY_SELECTED_PROBLEM_KEY = "local-leetcode:v12:selected-problem-id";
 const SELECTED_PROBLEM_KEY = "medikcode:v1:selected-problem-id";
@@ -56,10 +70,38 @@ function markPatternSeedImported() {
 }
 
 function normalizeProblem(problem: Problem): Problem {
+  const activeLanguage = isCodeLanguage(problem.activeLanguage)
+    ? problem.activeLanguage
+    : DEFAULT_CODE_LANGUAGE;
+  const codeByLanguage: ProblemCodeByLanguage = {
+    [DEFAULT_CODE_LANGUAGE]:
+      problem.code || getStarterCodeForLanguage(problem, DEFAULT_CODE_LANGUAGE),
+  };
+
+  for (const language of codeLanguageOptions) {
+    const code = problem.codeByLanguage?.[language.value];
+
+    if (typeof code === "string") {
+      codeByLanguage[language.value] = code;
+    }
+  }
+
+  if (!codeByLanguage[activeLanguage]) {
+    codeByLanguage[activeLanguage] = getStarterCodeForLanguage(problem, activeLanguage);
+  }
+
+  const submissions = (problem.submissions ?? []).map((submission) => ({
+    ...submission,
+    language: isCodeLanguage(submission.language) ? submission.language : DEFAULT_CODE_LANGUAGE,
+  }));
+
   return {
     ...problem,
+    activeLanguage,
+    code: codeByLanguage[activeLanguage] ?? problem.code,
+    codeByLanguage,
     notesMarkdown: problem.notesMarkdown ?? "",
-    submissions: problem.submissions ?? [],
+    submissions,
     testCases: problem.testCases ?? [],
     topics: problem.topics ?? [],
   };
@@ -74,6 +116,11 @@ function mergeProblem(existing: Problem | undefined, incoming: Problem): Problem
     ...incoming,
     source: existing.source ?? incoming.source,
     code: existing.code || incoming.code,
+    activeLanguage: existing.activeLanguage ?? incoming.activeLanguage,
+    codeByLanguage: {
+      ...(incoming.codeByLanguage ?? {}),
+      ...(existing.codeByLanguage ?? {}),
+    },
     notesMarkdown: existing.notesMarkdown ?? incoming.notesMarkdown ?? "",
     topics:
       existing.topics && existing.topics.length > 0 ? existing.topics : (incoming.topics ?? []),
@@ -100,11 +147,14 @@ type ProblemStore = {
   initialize: () => Promise<void>;
   selectProblem: (problemId: string) => Promise<void>;
   updateActiveProblem: (problem: Problem) => Promise<void>;
-  saveProblemCode: (problemId: string, code: string) => Promise<void>;
+  saveProblemCode: (problemId: string, language: CodeLanguage, code: string) => Promise<void>;
   addSubmission: (problemId: string, submission: Submission, code: string) => Promise<void>;
   deleteSubmission: (problemId: string, submissionId: string) => Promise<void>;
   deleteProblem: (problemId: string) => Promise<void>;
-  restoreSubmissionCode: (problemId: string, submissionId: string) => Promise<string | null>;
+  restoreSubmissionCode: (
+    problemId: string,
+    submissionId: string,
+  ) => Promise<{ code: string; language: CodeLanguage } | null>;
   addManualProblem: (problem: Problem) => Promise<void>;
   importProblems: (problems: Problem[]) => Promise<void>;
   exportBackup: () => Promise<ProblemsBackup>;
@@ -198,14 +248,31 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
     }));
   },
 
-  async saveProblemCode(problemId, code) {
+  async saveProblemCode(problemId, language, code) {
     const problem = await getProblemFromDb(problemId);
 
-    if (!problem || problem.code === code) {
+    if (!problem) {
       return;
     }
 
-    await putProblemToDb(normalizeProblem({ ...problem, code }));
+    const normalizedProblem = normalizeProblem(problem);
+    const currentCode = getProblemCode(normalizedProblem, language);
+
+    if (currentCode === code && normalizedProblem.activeLanguage === language) {
+      return;
+    }
+
+    await putProblemToDb(
+      normalizeProblem({
+        ...normalizedProblem,
+        activeLanguage: language,
+        code,
+        codeByLanguage: {
+          ...(normalizedProblem.codeByLanguage ?? {}),
+          [language]: code,
+        },
+      }),
+    );
   },
 
   async addSubmission(problemId, submission, code) {
@@ -215,9 +282,19 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       return;
     }
 
+    const normalizedProblem = normalizeProblem(problem);
+    const language = isCodeLanguage(submission.language)
+      ? submission.language
+      : (normalizedProblem.activeLanguage ?? DEFAULT_CODE_LANGUAGE);
+
     const nextProblem = normalizeProblem({
-      ...problem,
+      ...normalizedProblem,
+      activeLanguage: language,
       code,
+      codeByLanguage: {
+        ...(normalizedProblem.codeByLanguage ?? {}),
+        [language]: code,
+      },
       submissions: [...(problem.submissions ?? []), submission],
     });
 
@@ -303,7 +380,19 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       return null;
     }
 
-    const nextProblem = normalizeProblem({ ...problem, code: submission.code });
+    const normalizedProblem = normalizeProblem(problem);
+    const language = isCodeLanguage(submission.language)
+      ? submission.language
+      : DEFAULT_CODE_LANGUAGE;
+    const nextProblem = normalizeProblem({
+      ...normalizedProblem,
+      activeLanguage: language,
+      code: submission.code,
+      codeByLanguage: {
+        ...(normalizedProblem.codeByLanguage ?? {}),
+        [language]: submission.code,
+      },
+    });
 
     await putProblemToDb(nextProblem);
 
@@ -315,7 +404,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       ]),
     }));
 
-    return submission.code;
+    return { code: submission.code, language };
   },
 
   async addManualProblem(problem) {
