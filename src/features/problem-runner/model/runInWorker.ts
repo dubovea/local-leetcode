@@ -1,7 +1,7 @@
 import type { RunRequest, RunResult } from "@/entities/problem/model/types";
 
-const TIMEOUT_MS = 30000;
-const PYODIDE_TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 3000;
+const PYODIDE_TIMEOUT_MS = 10000;
 
 export function runInWorker(request: RunRequest): Promise<RunResult> {
   return new Promise((resolve) => {

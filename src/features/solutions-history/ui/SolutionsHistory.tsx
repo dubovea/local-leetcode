@@ -222,6 +222,11 @@ function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
   const bestMemoryPoint = getBestPoint(memoryPoints, (point) => point.memoryBytes);
   const bestOverallPoint = getBestOverallPoint(points);
   const sortedPoints = useMemo(() => sortPoints(points, sortMode), [points, sortMode]);
+  const runtimeDomainMax = useMemo(() => {
+    const maxRuntime = Math.max(...points.map((point) => point.runtimeMs), 0);
+
+    return Math.max(1, Math.ceil(maxRuntime * 1.1));
+  }, [points]);
 
   if (points.length === 0) {
     return null;
@@ -283,10 +288,13 @@ function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis axisLine={false} dataKey="label" tickLine={false} tickMargin={8} />
             <YAxis
+              allowDecimals
               axisLine={false}
+              domain={[0, runtimeDomainMax]}
               tickFormatter={(value) => formatRuntime(Number(value))}
               tickLine={false}
               tickMargin={8}
+              tickCount={5}
               width={54}
               yAxisId="runtime"
             />
@@ -312,6 +320,7 @@ function SolutionsPerformance({ submissions }: { submissions: Submission[] }) {
             <Bar
               dataKey="runtimeMs"
               fill="var(--color-runtimeMs)"
+              minPointSize={4}
               name="Runtime"
               radius={[4, 4, 0, 0]}
               yAxisId="runtime"

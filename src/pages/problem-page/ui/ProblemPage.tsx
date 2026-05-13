@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import type {
   CodeLanguage,
   Problem,
@@ -16,9 +17,13 @@ import { TopBar } from "@/widgets/top-bar/ui/TopBar";
 import { ProblemListDrawer } from "@/widgets/problem-list-drawer/ui/ProblemListDrawer";
 import { ProblemDescriptionPanel } from "@/widgets/problem-description/ui/ProblemDescriptionPanel";
 import { CodeWorkspace } from "@/widgets/code-workspace/ui/CodeWorkspace";
+import { UserDashboardPage } from "@/widgets/user-dashboard/ui/UserDashboardPage";
 
 type BottomTab = "testcase" | "result";
 type AppTheme = "dark" | "light";
+
+const PRACTICE_HISTORY_PATH = "/practice-history";
+const PROBLEM_PATH_PREFIX = "/problems/";
 
 const THEME_STORAGE_KEY = "medikcode:theme";
 const PERFORMANCE_NOTICE_STORAGE_KEY = "medikcode:v1:performance-notice-hidden";
@@ -129,6 +134,15 @@ export function ProblemPage() {
   const selectProblem = useProblemStore((state) => state.selectProblem);
   const updateActiveProblem = useProblemStore((state) => state.updateActiveProblem);
 
+  const navigate = useNavigate();
+  const currentPathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
+  const isPracticeHistoryRoute = currentPathname === PRACTICE_HISTORY_PATH;
+  const routeProblemId = currentPathname.startsWith(PROBLEM_PATH_PREFIX)
+    ? decodeURIComponent(currentPathname.slice(PROBLEM_PATH_PREFIX.length))
+    : null;
+
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [bottomTab, setBottomTab] = useState<BottomTab>("testcase");
@@ -151,6 +165,44 @@ export function ProblemPage() {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!hydrated || isPracticeHistoryRoute) {
+      return;
+    }
+
+    if (routeProblemId) {
+      const routeProblemExists = problemIndex.some((problem) => problem.id === routeProblemId);
+
+      if (routeProblemExists && routeProblemId !== activeProblemId) {
+        void selectProblem(routeProblemId);
+      } else if (!routeProblemExists && activeProblemId) {
+        void navigate({
+          params: { problemId: activeProblemId },
+          replace: true,
+          to: "/problems/$problemId",
+        });
+      }
+
+      return;
+    }
+
+    if (activeProblemId) {
+      void navigate({
+        params: { problemId: activeProblemId },
+        replace: true,
+        to: "/problems/$problemId",
+      });
+    }
+  }, [
+    activeProblemId,
+    hydrated,
+    isPracticeHistoryRoute,
+    navigate,
+    problemIndex,
+    routeProblemId,
+    selectProblem,
+  ]);
 
   useEffect(() => {
     if (!activeProblem) {
@@ -230,6 +282,7 @@ export function ProblemPage() {
   async function handleSelectProblem(problemId: string) {
     await selectProblem(problemId);
     setDrawerOpen(false);
+    void navigate({ params: { problemId }, to: "/problems/$problemId" });
   }
 
   function handleCodeDraftChange(problemId: string, language: CodeLanguage, code: string) {
@@ -336,6 +389,7 @@ export function ProblemPage() {
   async function handleImportBackup(backup: ProblemsBackup | Problem[]) {
     await importBackup(backup);
     setDrawerOpen(false);
+    void navigate({ to: "/" });
   }
 
   function handleClosePerformanceNotice(hidePermanently: boolean) {
@@ -374,6 +428,35 @@ export function ProblemPage() {
     [handleDeleteSubmission],
   );
 
+  const loadDashboardProblems = useCallback(async () => {
+    const backup = await exportBackup();
+
+    return backup.problems;
+  }, [exportBackup]);
+
+  const openDashboard = useCallback(() => {
+    setDrawerOpen(false);
+    void navigate({ to: PRACTICE_HISTORY_PATH });
+  }, [navigate]);
+
+  const openProblemList = useCallback(() => {
+    if (activeProblemId) {
+      void navigate({ params: { problemId: activeProblemId }, to: "/problems/$problemId" });
+    } else {
+      void navigate({ to: "/" });
+    }
+
+    setDrawerOpen(true);
+  }, [activeProblemId, navigate]);
+
+  const openWorkspace = useCallback(() => {
+    if (activeProblemId) {
+      void navigate({ params: { problemId: activeProblemId }, to: "/problems/$problemId" });
+    } else {
+      void navigate({ to: "/" });
+    }
+  }, [activeProblemId, navigate]);
+
   if (!hydrated) {
     return (
       <div className="flex h-screen items-center justify-center bg-[var(--lc-page)] text-sm text-[var(--lc-muted)]">
@@ -394,10 +477,13 @@ export function ProblemPage() {
     return (
       <div className="flex h-screen min-h-0 flex-col bg-[var(--lc-page)] text-[var(--lc-text)]">
         <TopBar
+          activeDashboard={isPracticeHistoryRoute}
           actionsDisabled
+          showActions={!isPracticeHistoryRoute}
           theme={theme}
           running={running}
-          onOpenProblemList={() => setDrawerOpen(true)}
+          onOpenDashboard={openDashboard}
+          onOpenProblemList={openProblemList}
           onPlay={() => undefined}
           onSubmit={() => undefined}
           onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
@@ -425,17 +511,26 @@ export function ProblemPage() {
           onClose={handleClosePerformanceNotice}
         />
 
-        <main className="flex flex-1 items-center justify-center p-6">
-          <div className="max-w-sm text-center">
-            <h1 className="mb-2 text-xl font-semibold text-[var(--lc-text-strong)]">
-              No problems yet
-            </h1>
-            <p className="mb-4 text-sm text-[var(--lc-muted)]">
-              Create a manual problem or import a backup to continue.
-            </p>
-            <Button onClick={() => setDrawerOpen(true)}>Open problems</Button>
-          </div>
-        </main>
+        {isPracticeHistoryRoute ? (
+          <UserDashboardPage
+            problemIndex={problemIndex}
+            onBackToProblems={openWorkspace}
+            onLoadProblems={loadDashboardProblems}
+            onOpenProblem={(problemId) => void handleSelectProblem(problemId)}
+          />
+        ) : (
+          <main className="flex flex-1 items-center justify-center p-6">
+            <div className="max-w-sm text-center">
+              <h1 className="mb-2 text-xl font-semibold text-[var(--lc-text-strong)]">
+                No problems yet
+              </h1>
+              <p className="mb-4 text-sm text-[var(--lc-muted)]">
+                Create a manual problem or import a backup to continue.
+              </p>
+              <Button onClick={openProblemList}>Open problems</Button>
+            </div>
+          </main>
+        )}
       </div>
     );
   }
@@ -443,9 +538,12 @@ export function ProblemPage() {
   return (
     <div className="flex h-screen min-h-0 flex-col bg-[var(--lc-page)] text-[var(--lc-text)]">
       <TopBar
+        activeDashboard={isPracticeHistoryRoute}
+        showActions={!isPracticeHistoryRoute}
         theme={theme}
         running={running}
-        onOpenProblemList={() => setDrawerOpen(true)}
+        onOpenDashboard={openDashboard}
+        onOpenProblemList={openProblemList}
         onPlay={() => void execute(false)}
         onSubmit={() => void execute(true)}
         onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
@@ -473,39 +571,48 @@ export function ProblemPage() {
         onClose={handleClosePerformanceNotice}
       />
 
-      <main className="grid min-h-0 flex-1 grid-cols-[46%_54%] gap-2 p-2">
-        <ProblemDescriptionPanel
-          problem={activeProblem}
+      {isPracticeHistoryRoute ? (
+        <UserDashboardPage
           problemIndex={problemIndex}
-          onChange={handleDescriptionChange}
-          onSelectProblem={handleDescriptionSelectProblem}
-          onRestoreSubmission={handleDescriptionRestoreSubmission}
-          onDeleteSubmission={handleDescriptionDeleteSubmission}
+          onBackToProblems={openWorkspace}
+          onLoadProblems={loadDashboardProblems}
+          onOpenProblem={(problemId) => void handleSelectProblem(problemId)}
         />
-        <CodeWorkspace
-          activeCaseId={activeCaseId}
-          bottomTab={bottomTab}
-          code={
-            (draftMatchesActiveProblem
-              ? latestCodeByLanguageRef.current[currentLanguage]
-              : undefined) ?? getProblemCode(activeProblem, currentLanguage)
-          }
-          editorResetKey={editorResetKey}
-          language={currentLanguage}
-          problem={activeProblem}
-          result={lastResult}
-          theme={theme}
-          onActiveCaseChange={setActiveCaseId}
-          onBottomTabChange={setBottomTab}
-          onLanguageChange={(language) => void handleLanguageChange(language)}
-          onProblemChange={(problem) => void handleProblemChange(problem)}
-          onCodeDraftChange={handleCodeDraftChange}
-          onCodeChange={(problemId, language, code) =>
-            void handleCodeChange(problemId, language, code)
-          }
-          onRun={() => void execute(false)}
-        />
-      </main>
+      ) : (
+        <main className="grid min-h-0 flex-1 grid-cols-[46%_54%] gap-2 p-2">
+          <ProblemDescriptionPanel
+            problem={activeProblem}
+            problemIndex={problemIndex}
+            onChange={handleDescriptionChange}
+            onSelectProblem={handleDescriptionSelectProblem}
+            onRestoreSubmission={handleDescriptionRestoreSubmission}
+            onDeleteSubmission={handleDescriptionDeleteSubmission}
+          />
+          <CodeWorkspace
+            activeCaseId={activeCaseId}
+            bottomTab={bottomTab}
+            code={
+              (draftMatchesActiveProblem
+                ? latestCodeByLanguageRef.current[currentLanguage]
+                : undefined) ?? getProblemCode(activeProblem, currentLanguage)
+            }
+            editorResetKey={editorResetKey}
+            language={currentLanguage}
+            problem={activeProblem}
+            result={lastResult}
+            theme={theme}
+            onActiveCaseChange={setActiveCaseId}
+            onBottomTabChange={setBottomTab}
+            onLanguageChange={(language) => void handleLanguageChange(language)}
+            onProblemChange={(problem) => void handleProblemChange(problem)}
+            onCodeDraftChange={handleCodeDraftChange}
+            onCodeChange={(problemId, language, code) =>
+              void handleCodeChange(problemId, language, code)
+            }
+            onRun={() => void execute(false)}
+          />
+        </main>
+      )}
     </div>
   );
 }

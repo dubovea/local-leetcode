@@ -1,5 +1,6 @@
-import { ProblemPage } from "@/pages/problem-page/ui/ProblemPage";
+import { RouterProvider } from "@tanstack/react-router";
+import { router } from "./router";
 
 export function App() {
-  return <ProblemPage />;
+  return <RouterProvider router={router} />;
 }
