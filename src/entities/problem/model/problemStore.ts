@@ -184,6 +184,7 @@ type ProblemStore = {
   exportBackup: () => Promise<ProblemsBackup>;
   importBackup: (backup: ProblemsBackup | Problem[]) => Promise<void>;
   resetProblems: () => Promise<void>;
+  resetSubmissions: () => Promise<void>;
 };
 
 export const useProblemStore = create<ProblemStore>((set, get) => ({
@@ -520,6 +521,27 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
       activeProblemId: null,
       errorText: "",
       problemIndex: [],
+    });
+  },
+
+  async resetSubmissions() {
+    const problems = (await getAllProblemsFromDb()).map((problem) =>
+      normalizeProblem({
+        ...problem,
+        submissions: [],
+      }),
+    );
+
+    await putProblemsToDb(problems);
+
+    const activeProblemId = get().activeProblemId;
+    const activeProblem = activeProblemId
+      ? (problems.find((problem) => problem.id === activeProblemId) ?? null)
+      : null;
+
+    set({
+      activeProblem,
+      problemIndex: sortProblemIndex(problems.map(toProblemListItem)),
     });
   },
 }));

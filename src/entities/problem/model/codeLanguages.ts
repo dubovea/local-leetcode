@@ -108,6 +108,18 @@ export function getStarterCodeForLanguage(problem: Problem, language: CodeLangua
   return problem.code;
 }
 
+export function getResetCodeForLanguage(problem: Problem, language: CodeLanguage) {
+  const functionName = problem.functionName || "solution";
+  const parameters = getProblemParameters(problem);
+  const parameterText = parameters.join(", ");
+
+  if (language === "python-pyodide") {
+    return `def ${functionName}(${parameterText}):\n    return None\n`;
+  }
+
+  return `/**\n * Write your solution here.\n */\nvar ${functionName} = function(${parameterText}) {\n  \n};`;
+}
+
 export function getProblemCode(problem: Problem, language: CodeLanguage) {
   return (
     problem.codeByLanguage?.[language] ??

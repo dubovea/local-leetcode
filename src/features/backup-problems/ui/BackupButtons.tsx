@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Download, MoreHorizontal, Trash2, UploadCloud } from "lucide-react";
+import { Download, MoreHorizontal, RotateCcw, Trash2, UploadCloud } from "lucide-react";
 import type { Problem, ProblemsBackup } from "@/entities/problem/model/types";
 import { Button } from "@/shared/ui/button";
 import {
@@ -44,11 +44,13 @@ export function BackupButtons({
   onExport,
   onImport,
   onReset,
+  onResetSubmissions,
   onStatusChange,
 }: {
   onExport: () => Promise<ProblemsBackup>;
   onImport: (backup: ProblemsBackup | Problem[]) => Promise<void>;
   onReset: () => void;
+  onResetSubmissions: () => void;
   onStatusChange: (message: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -76,6 +78,18 @@ export function BackupButtons({
         inputRef.current.value = "";
       }
     }
+  }
+
+  async function handleResetSubmissions() {
+    const confirmed = window.confirm(
+      "Сбросить всю историю решений? Попытки и статусы решённых задач будут удалены.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await onResetSubmissions();
   }
 
   return (
@@ -116,6 +130,10 @@ export function BackupButtons({
           <DropdownMenuItem variant="destructive" onSelect={onReset}>
             <Trash2 className="h-4 w-4" />
             Удалить все задачи
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onSelect={handleResetSubmissions}>
+            <RotateCcw className="h-4 w-4" />
+            Сбросить все решения
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

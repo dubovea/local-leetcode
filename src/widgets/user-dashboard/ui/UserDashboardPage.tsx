@@ -11,6 +11,7 @@ import {
   ExternalLink,
   ListChecks,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
@@ -566,11 +567,13 @@ export function UserDashboardPage({
   onBackToProblems,
   onLoadProblems,
   onOpenProblem,
+  onResetSubmissions,
 }: {
   problemIndex: ProblemListItem[];
   onBackToProblems: () => void;
   onLoadProblems: () => Promise<Problem[]>;
   onOpenProblem: (problemId: string) => void;
+  onResetSubmissions: () => Promise<void>;
 }) {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -584,6 +587,24 @@ export function UserDashboardPage({
   }, [historyFilter, historyItems, sortMode]);
   const summary = useMemo(() => buildSummary(historyItems), [historyItems]);
   const activityPoints = useMemo(() => buildActivityPoints(historyItems), [historyItems]);
+
+  async function handleResetSubmissions() {
+    const confirmed = window.confirm(
+      "Сбросить всю историю решений? Попытки и статусы решённых задач будут удалены.",
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    await onResetSubmissions();
+    setProblems((currentProblems) =>
+      currentProblems.map((problem) => ({
+        ...problem,
+        submissions: [],
+      })),
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -627,9 +648,15 @@ export function UserDashboardPage({
               </p>
             </div>
 
-            <Button variant="secondary" onClick={onBackToProblems}>
-              <RotateCcw className="h-4 w-4" />К задачам
-            </Button>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button variant="destructive" onClick={() => void handleResetSubmissions()}>
+                <Trash2 className="h-4 w-4" />
+                Сбросить
+              </Button>
+              <Button variant="secondary" onClick={onBackToProblems}>
+                <RotateCcw className="h-4 w-4" />К задачам
+              </Button>
+            </div>
           </div>
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

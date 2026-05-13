@@ -6,12 +6,14 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
+  CircleX,
   Gauge,
   ListFilter,
   Plus,
   Search,
   Tags,
   Trash2,
+  X,
 } from "lucide-react";
 
 import type {
@@ -174,9 +176,7 @@ function FilterButton({
       aria-label={title}
       aria-pressed={active}
       className={cn(
-        active
-          ? "border-[var(--lc-border-strong)] bg-[var(--lc-active)] text-[var(--lc-text-strong)]"
-          : "",
+        active && "border-(--lc-border-strong) bg-(--lc-active) text-(--lc-text-strong)",
       )}
       size="icon"
       title={title}
@@ -323,6 +323,7 @@ export function ProblemListDrawer({
   onExportBackup,
   onImportBackup,
   onDeleteProblem,
+  onResetSubmissions,
 }: {
   open: boolean;
   problemIndex: ProblemListItem[];
@@ -335,6 +336,7 @@ export function ProblemListDrawer({
   onExportBackup: () => Promise<ProblemsBackup>;
   onImportBackup: (backup: ProblemsBackup | Problem[]) => Promise<void>;
   onDeleteProblem: (problemId: string) => void;
+  onResetSubmissions: () => Promise<void>;
 }) {
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
 
@@ -499,6 +501,7 @@ export function ProblemListDrawer({
             <ImportProblemsButton onImport={onImportProblems} onStatusChange={setImportStatus} />
 
             <BackupButtons
+              onResetSubmissions={onResetSubmissions}
               onExport={onExportBackup}
               onImport={onImportBackup}
               onReset={resetProblems}
@@ -526,13 +529,21 @@ export function ProblemListDrawer({
           <div className="flex items-center gap-2">
             <div className="relative min-w-0 flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--lc-subtle)]" />
-
               <Input
-                className="rounded-full pl-9"
+                className="rounded-full pl-9 pr-8"
                 placeholder="Поиск задач"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--lc-subtle)] hover:text-foreground focus:outline-none"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel)] p-0.5">
@@ -541,7 +552,7 @@ export function ProblemListDrawer({
                 title={statusFilterTitle.all}
                 onClick={() => setStatusFilter("all")}
               >
-                <ListFilter className="h-4 w-4" />
+                <ListFilter className={cn("h4 w-4", statusFilter === "all" && "text-blue-500")} />
               </FilterButton>
 
               <FilterButton
@@ -549,14 +560,15 @@ export function ProblemListDrawer({
                 title={statusFilterTitle.solved}
                 onClick={() => setStatusFilter("solved")}
               >
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircle2 className={cn("h4 w-4", statusFilter === "solved" && "text-green-500")} />
               </FilterButton>
+
               <FilterButton
                 active={statusFilter === "unsolved"}
                 title={statusFilterTitle.unsolved}
                 onClick={() => setStatusFilter("unsolved")}
               >
-                <Circle className="h-4 w-4" />
+                <CircleX className={cn("h4 w-4", statusFilter === "unsolved" && "text-red-500")} />
               </FilterButton>
             </div>
           </div>

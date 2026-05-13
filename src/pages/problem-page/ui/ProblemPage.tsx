@@ -9,7 +9,11 @@ import type {
   Submission,
 } from "@/entities/problem/model/types";
 import { useProblemStore } from "@/entities/problem/model/problemStore";
-import { DEFAULT_CODE_LANGUAGE, getProblemCode } from "@/entities/problem/model/codeLanguages";
+import {
+  DEFAULT_CODE_LANGUAGE,
+  getProblemCode,
+  getResetCodeForLanguage,
+} from "@/entities/problem/model/codeLanguages";
 import { runInWorker } from "@/features/problem-runner/model/runInWorker";
 import { generateSmartTestCases } from "@/features/problem-runner/model/smartTestCases";
 import { createId } from "@/shared/lib/id";
@@ -130,6 +134,7 @@ export function ProblemPage() {
   const initialize = useProblemStore((state) => state.initialize);
   const problemIndex = useProblemStore((state) => state.problemIndex);
   const resetProblems = useProblemStore((state) => state.resetProblems);
+  const resetSubmissions = useProblemStore((state) => state.resetSubmissions);
   const restoreSubmissionCode = useProblemStore((state) => state.restoreSubmissionCode);
   const saveProblemCode = useProblemStore((state) => state.saveProblemCode);
   const selectProblem = useProblemStore((state) => state.selectProblem);
@@ -143,6 +148,13 @@ export function ProblemPage() {
   const routeProblemId = currentPathname.startsWith(PROBLEM_PATH_PREFIX)
     ? decodeURIComponent(currentPathname.slice(PROBLEM_PATH_PREFIX.length))
     : null;
+  const activeProblemPosition = activeProblemId
+    ? problemIndex.findIndex((problem) => problem.id === activeProblemId)
+    : -1;
+  const canSelectPreviousProblem = activeProblemPosition > 0;
+  const canSelectNextProblem =
+    activeProblemPosition >= 0 && activeProblemPosition < problemIndex.length - 1;
+  const canSelectRandomProblem = problemIndex.length > 1;
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [running, setRunning] = useState(false);
@@ -281,10 +293,36 @@ export function ProblemPage() {
     ],
   );
 
-  async function handleSelectProblem(problemId: string) {
-    await selectProblem(problemId);
+  function handleSelectProblem(problemId: string) {
     setDrawerOpen(false);
     void navigate({ params: { problemId }, to: "/problems/$problemId" });
+  }
+
+  function handleSelectPreviousProblem() {
+    const previousProblem = canSelectPreviousProblem
+      ? problemIndex[activeProblemPosition - 1]
+      : null;
+
+    if (previousProblem) {
+      handleSelectProblem(previousProblem.id);
+    }
+  }
+
+  function handleSelectNextProblem() {
+    const nextProblem = canSelectNextProblem ? problemIndex[activeProblemPosition + 1] : null;
+
+    if (nextProblem) {
+      handleSelectProblem(nextProblem.id);
+    }
+  }
+
+  function handleSelectRandomProblem() {
+    const availableProblems = problemIndex.filter((problem) => problem.id !== activeProblemId);
+    const nextProblem = availableProblems[Math.floor(Math.random() * availableProblems.length)];
+
+    if (nextProblem) {
+      handleSelectProblem(nextProblem.id);
+    }
   }
 
   function handleCodeDraftChange(problemId: string, language: CodeLanguage, code: string) {
@@ -299,6 +337,25 @@ export function ProblemPage() {
 
   async function handleCodeChange(problemId: string, language: CodeLanguage, code: string) {
     await saveProblemCode(problemId, language, code);
+  }
+
+  async function handleResetCode() {
+    if (!activeProblem) {
+      return;
+    }
+
+    const resetCode = getResetCodeForLanguage(activeProblem, currentLanguage);
+
+    latestCodeProblemIdRef.current = activeProblem.id;
+    latestCodeByLanguageRef.current = {
+      ...latestCodeByLanguageRef.current,
+      [currentLanguage]: resetCode,
+    };
+    setLastResult(null);
+    setBottomTab("testcase");
+    setEditorResetKey((value) => value + 1);
+
+    await saveProblemCode(activeProblem.id, currentLanguage, resetCode);
   }
 
   async function handleLanguageChange(language: CodeLanguage) {
@@ -481,12 +538,19 @@ export function ProblemPage() {
         <TopBar
           activeDashboard={isPracticeHistoryRoute}
           actionsDisabled
+          canSelectNextProblem={canSelectNextProblem}
+          canSelectPreviousProblem={canSelectPreviousProblem}
+          canSelectRandomProblem={canSelectRandomProblem}
           showActions={!isPracticeHistoryRoute}
+          showProblemNavigation={!isPracticeHistoryRoute}
           theme={theme}
           running={running}
           onOpenDashboard={openDashboard}
           onOpenProblemList={openProblemList}
           onPlay={() => undefined}
+          onSelectNextProblem={handleSelectNextProblem}
+          onSelectPreviousProblem={handleSelectPreviousProblem}
+          onSelectRandomProblem={handleSelectRandomProblem}
           onSubmit={() => undefined}
           onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
         />
@@ -505,6 +569,7 @@ export function ProblemPage() {
           onExportBackup={exportBackup}
           onImportBackup={handleImportBackup}
           onResetProblems={() => void resetProblems()}
+          onResetSubmissions={() => resetSubmissions()}
           onDeleteProblem={(problemId) => void deleteProblem(problemId)}
         />
 
@@ -519,6 +584,7 @@ export function ProblemPage() {
             onBackToProblems={openWorkspace}
             onLoadProblems={loadDashboardProblems}
             onOpenProblem={(problemId) => void handleSelectProblem(problemId)}
+            onResetSubmissions={() => resetSubmissions()}
           />
         ) : (
           <main className="flex flex-1 items-center justify-center p-6">
@@ -541,12 +607,19 @@ export function ProblemPage() {
     <div className="flex h-screen min-h-0 flex-col bg-[var(--lc-page)] text-[var(--lc-text)]">
       <TopBar
         activeDashboard={isPracticeHistoryRoute}
+        canSelectNextProblem={canSelectNextProblem}
+        canSelectPreviousProblem={canSelectPreviousProblem}
+        canSelectRandomProblem={canSelectRandomProblem}
         showActions={!isPracticeHistoryRoute}
+        showProblemNavigation={!isPracticeHistoryRoute}
         theme={theme}
         running={running}
         onOpenDashboard={openDashboard}
         onOpenProblemList={openProblemList}
         onPlay={() => void execute(false)}
+        onSelectNextProblem={handleSelectNextProblem}
+        onSelectPreviousProblem={handleSelectPreviousProblem}
+        onSelectRandomProblem={handleSelectRandomProblem}
         onSubmit={() => void execute(true)}
         onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
       />
@@ -565,6 +638,7 @@ export function ProblemPage() {
         onExportBackup={exportBackup}
         onImportBackup={handleImportBackup}
         onResetProblems={() => void resetProblems()}
+        onResetSubmissions={() => resetSubmissions()}
         onDeleteProblem={(problemId) => void deleteProblem(problemId)}
       />
 
@@ -579,6 +653,7 @@ export function ProblemPage() {
           onBackToProblems={openWorkspace}
           onLoadProblems={loadDashboardProblems}
           onOpenProblem={(problemId) => void handleSelectProblem(problemId)}
+          onResetSubmissions={() => resetSubmissions()}
         />
       ) : (
         <main className="grid min-h-0 flex-1 grid-cols-[46%_54%] gap-2 p-2">
@@ -611,6 +686,7 @@ export function ProblemPage() {
             onCodeChange={(problemId, language, code) =>
               void handleCodeChange(problemId, language, code)
             }
+            onResetCode={() => void handleResetCode()}
             onRun={() => void execute(false)}
           />
         </main>

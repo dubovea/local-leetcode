@@ -1,10 +1,11 @@
-import { AlertCircle, CheckSquare, Code2, FileText } from "lucide-react";
+import { AlertCircle, CheckSquare, Code2, FileText, RotateCcw } from "lucide-react";
 import type { CodeLanguage, Problem, RunResult, TestCase } from "@/entities/problem/model/types";
 import { codeLanguageOptions } from "@/entities/problem/model/codeLanguages";
 import { SolutionEditor } from "@/features/problem-editor/ui/SolutionEditor";
 import { TestcaseEditor } from "@/features/testcases/ui/TestcaseEditor";
 import { TestResultPanel } from "@/widgets/test-result-panel/ui/TestResultPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
+import { Button } from "@/shared/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
 type BottomTab = "testcase" | "result";
@@ -25,6 +26,7 @@ export function CodeWorkspace({
   onProblemChange,
   onCodeChange,
   onCodeDraftChange,
+  onResetCode,
   onRun,
 }: {
   problem: Problem;
@@ -41,6 +43,7 @@ export function CodeWorkspace({
   onProblemChange: (problem: Problem) => void;
   onCodeChange: (problemId: string, language: CodeLanguage, code: string) => void;
   onCodeDraftChange: (problemId: string, language: CodeLanguage, code: string) => void;
+  onResetCode: () => void;
   onRun: () => void;
 }) {
   const missingActiveLanguageSnippet = (problem.missingCodeLanguages ?? []).includes(language);
@@ -67,6 +70,7 @@ export function CodeWorkspace({
                 Generated starter
               </div>
             ) : null}
+
             <Select
               value={language}
               onValueChange={(value) => onLanguageChange(value as CodeLanguage)}
@@ -86,6 +90,16 @@ export function CodeWorkspace({
                 ))}
               </SelectContent>
             </Select>
+
+            <Button
+              aria-label="Сбросить решение"
+              size="icon"
+              title="Сбросить решение"
+              variant="default"
+              onClick={onResetCode}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         <div className="h-[calc(100%-44px)]">
