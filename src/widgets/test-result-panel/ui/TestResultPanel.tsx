@@ -6,6 +6,7 @@ import type {
   RunStatus,
   TestCase,
 } from "@/entities/problem/model/types";
+import { isSmartTestCaseId } from "@/features/problem-runner/model/smartTestCases";
 import { formatRuntime } from "@/shared/lib/date";
 import { StatusText } from "@/shared/ui/StatusText";
 import { cn } from "@/shared/lib/cn";
@@ -59,6 +60,14 @@ function CaseTabs({
   visibleCaseId?: string;
   onActiveCaseChange: (id: string) => void;
 }) {
+  const smartCaseNumbers = new Map<string, number>();
+
+  for (const testCase of cases) {
+    if (isSmartTestCaseId(testCase.id)) {
+      smartCaseNumbers.set(testCase.id, smartCaseNumbers.size + 1);
+    }
+  }
+
   return (
     <div className="flex gap-2 overflow-x-auto border-b border-[var(--lc-border)] px-3 py-2">
       {cases.map((testCase, index) => {
@@ -89,7 +98,9 @@ function CaseTabs({
                 )}
               />
             ) : null}
-            Case {index + 1}
+            {smartCaseNumbers.has(testCase.id)
+              ? `Авто ${smartCaseNumbers.get(testCase.id)}`
+              : `Case ${index + 1}`}
           </button>
         );
       })}
@@ -133,6 +144,7 @@ export function TestResultPanel({
   const fallbackCase = firstFailedCase(result.cases);
   const visibleCase = result.cases.find((testCase) => testCase.id === activeCaseId) ?? fallbackCase;
   const status: RunStatus = result.status;
+  const smartCasesCount = result.cases.filter((testCase) => isSmartTestCaseId(testCase.id)).length;
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
@@ -151,6 +163,9 @@ export function TestResultPanel({
             <span className="text-sm text-[var(--lc-muted)]">
               {result.passedCount}/{result.totalCount} cases passed
             </span>
+            {smartCasesCount > 0 ? (
+              <span className="text-sm text-[var(--lc-muted)]">Автотесты: {smartCasesCount}</span>
+            ) : null}
           </div>
 
           {result.status === "runtime-error" || result.status === "timeout" ? (

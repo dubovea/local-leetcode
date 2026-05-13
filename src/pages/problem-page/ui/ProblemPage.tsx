@@ -11,6 +11,7 @@ import type {
 import { useProblemStore } from "@/entities/problem/model/problemStore";
 import { DEFAULT_CODE_LANGUAGE, getProblemCode } from "@/entities/problem/model/codeLanguages";
 import { runInWorker } from "@/features/problem-runner/model/runInWorker";
+import { generateSmartTestCases } from "@/features/problem-runner/model/smartTestCases";
 import { createId } from "@/shared/lib/id";
 import { Button } from "@/shared/ui/button";
 import { TopBar } from "@/widgets/top-bar/ui/TopBar";
@@ -242,7 +243,7 @@ export function ProblemPage() {
       const code =
         (draftMatchesActiveProblem ? latestCodeByLanguageRef.current[language] : undefined) ??
         getProblemCode(activeProblem, language);
-      const testCases = activeProblem.testCases;
+      const testCases = [...activeProblem.testCases, ...generateSmartTestCases(activeProblem)];
 
       if (testCases.length === 0) {
         return;
@@ -260,6 +261,7 @@ export function ProblemPage() {
       });
 
       setLastResult(result);
+      setActiveCaseId(result.cases.find((testCase) => !testCase.passed)?.id ?? result.cases[0]?.id);
 
       if (saveSubmission) {
         await addSubmission(activeProblem.id, resultToSubmission(result, code, language), code);

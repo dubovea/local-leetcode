@@ -99,6 +99,12 @@ const activityChartConfig = {
   },
 } satisfies ChartConfig;
 
+const dashboardTabsTriggerClassName =
+  "px-4 text-sm text-[var(--lc-muted)] data-active:bg-[var(--lc-panel-raised)] data-active:text-[var(--lc-text-strong)] data-[state=active]:bg-[var(--lc-panel-raised)] data-[state=active]:text-[var(--lc-text-strong)] data-[state=active]:shadow-sm";
+
+const activityTabsTriggerClassName =
+  "px-3 text-xs text-[var(--lc-muted)] data-active:bg-[var(--lc-panel-raised)] data-active:text-[var(--lc-text-strong)] data-[state=active]:bg-[var(--lc-panel-raised)] data-[state=active]:text-[var(--lc-text-strong)] data-[state=active]:shadow-sm";
+
 function getSubmittedAtTime(submission: Submission) {
   const time = new Date(submission.submittedAt).getTime();
 
@@ -364,10 +370,10 @@ function SummaryPanel({
             onValueChange={(value) => setActivityMode(value as ActivityMode)}
           >
             <TabsList className="h-8 bg-[var(--lc-hover)]" variant="default">
-              <TabsTrigger className="px-3 text-xs" value="solved">
+              <TabsTrigger className={activityTabsTriggerClassName} value="solved">
                 Решено
               </TabsTrigger>
-              <TabsTrigger className="px-3 text-xs" value="submissions">
+              <TabsTrigger className={activityTabsTriggerClassName} value="submissions">
                 Попытки
               </TabsTrigger>
             </TabsList>
@@ -632,13 +638,13 @@ export function UserDashboardPage({
               onValueChange={(value) => setHistoryFilter(value as HistoryFilter)}
             >
               <TabsList className="h-9 bg-[var(--lc-hover)]" variant="default">
-                <TabsTrigger className="px-4 text-sm" value="all">
+                <TabsTrigger className={dashboardTabsTriggerClassName} value="all">
                   Все
                 </TabsTrigger>
-                <TabsTrigger className="px-4 text-sm" value="solved">
+                <TabsTrigger className={dashboardTabsTriggerClassName} value="solved">
                   Решённые
                 </TabsTrigger>
-                <TabsTrigger className="px-4 text-sm" value="unsolved">
+                <TabsTrigger className={dashboardTabsTriggerClassName} value="unsolved">
                   Не решённые
                 </TabsTrigger>
               </TabsList>
