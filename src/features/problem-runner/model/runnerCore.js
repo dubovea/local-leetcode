@@ -1,4 +1,11 @@
-import { cleanValueText, evaluateLiteral, parseInputAssignments } from "./runnerInput.js";
+import {
+  cleanValueText,
+  evaluateLiteral,
+  formatExpectedOutput,
+  formatNamedOutput,
+  parseExpectedOutput,
+  parseInputAssignments,
+} from "./runnerInput.js";
 import { maxCaseMemoryBytes, measureMemoryBytes, nowMs, readMemoryBytes } from "./runnerMetrics.js";
 import { compareValues, createConsole, formatError, stringifyValue } from "./runnerValue.js";
 import { compileUserCode, executeDesignCase } from "./runnerJavaScript.js";
@@ -6,6 +13,7 @@ import {
   getPythonCallPlan,
   getPythonTypeHints,
   getStructuredKind,
+  serializeInputJS,
   transformInputJS,
   transformOutputJS,
 } from "./runnerTypeTransforms.js";
@@ -86,6 +94,79 @@ function buildRunResult(cases, logs, totalCount) {
   };
 }
 
+function namedValuesToMap(serializedInput) {
+  return new Map(serializedInput.names.map((name, index) => [name, serializedInput.values[index]]));
+}
+
+function buildNamedOutput(expected, returnValue, serializedInput) {
+  const valuesByName = namedValuesToMap(serializedInput);
+
+  return {
+    kind: "named",
+    hasReturn: expected.hasReturn,
+    returnValue,
+    fields: expected.fields.map((field) => ({
+      name: field.name,
+      value: valuesByName.get(field.name),
+    })),
+  };
+}
+
+function compareNamedOutput(output, expected, judgeMode) {
+  if (expected.hasReturn && !compareValues(output.returnValue, expected.returnValue, judgeMode)) {
+    return false;
+  }
+
+  return expected.fields.every((expectedField, index) =>
+    compareValues(output.fields[index]?.value, expectedField.value, judgeMode),
+  );
+}
+
+function compareRunOutput(output, expected, judgeMode) {
+  if (expected.kind === "named") {
+    return compareNamedOutput(output, expected, judgeMode);
+  }
+
+  return compareValues(output, expected.value, judgeMode);
+}
+
+function formatRunOutput(output, expected) {
+  if (expected.kind === "named") {
+    return formatNamedOutput(output);
+  }
+
+  return stringifyValue(output);
+}
+
+function buildJavaScriptCaseOutput({ expected, output, parsedInput, transformedInput, code, designCase }) {
+  if (expected.kind === "named" && !designCase) {
+    const returnValue = transformOutputJS(output, code);
+    const serializedInput = serializeInputJS(transformedInput, code, parsedInput.names);
+    return buildNamedOutput(expected, returnValue, serializedInput);
+  }
+
+  return designCase ? output : transformOutputJS(output, code, transformedInput[0]);
+}
+
+function serializePythonArg(compiled, arg, kind) {
+  const serializedArg = kind ? compiled.serializeValue(arg, kind) : arg;
+
+  try {
+    return pythonValueToJs(serializedArg);
+  } finally {
+    if (serializedArg !== arg) {
+      destroyPyProxy(serializedArg);
+    }
+  }
+}
+
+function serializePythonInput(compiled, args, callPlan) {
+  return {
+    names: callPlan.map((item) => item.name),
+    values: callPlan.map((item, index) => serializePythonArg(compiled, args[index], item.kind)),
+  };
+}
+
 async function runJavaScriptUserCode(request) {
   const logs = [];
   const totalStartedAt = nowMs();
@@ -107,7 +188,7 @@ async function runJavaScriptUserCode(request) {
 
     try {
       const parsedInput = parseInputAssignments(testCase.input);
-      const expected = evaluateLiteral(testCase.expected);
+      const expected = parseExpectedOutput(testCase.expected);
       const designCase = readDesignCase(parsedInput);
       const transformedInput = transformInputJS(
         parsedInput.values,
@@ -121,17 +202,21 @@ async function runJavaScriptUserCode(request) {
         ? executeDesignCase(compiled.solution, designCase, request.code)
         : await compiled.solution(...transformedInput);
       durationMs = nowMs() - solutionStartedAt;
-
-      const normalizedOutput = designCase
-        ? output
-        : transformOutputJS(output, request.code, transformedInput[0]);
+      const normalizedOutput = buildJavaScriptCaseOutput({
+        expected,
+        output,
+        parsedInput,
+        transformedInput,
+        code: request.code,
+        designCase,
+      });
       const memoryBytes = await measureMemoryBytes(
         memoryStartedBytes,
         normalizedOutput,
         [parsedInput.values, transformedInput, output],
         compiled.memoryTracker.readBytes(),
       );
-      const passed = compareValues(normalizedOutput, expected, request.judgeMode);
+      const passed = compareRunOutput(normalizedOutput, expected, request.judgeMode);
       cases.push({
         id: testCase.id,
         name: `Case ${index + 1}`,
@@ -139,8 +224,8 @@ async function runJavaScriptUserCode(request) {
         durationMs,
         memoryBytes,
         inputText: testCase.input,
-        outputText: stringifyValue(normalizedOutput),
-        expectedText: stringifyValue(expected),
+        outputText: formatRunOutput(normalizedOutput, expected),
+        expectedText: formatExpectedOutput(expected),
       });
     } catch (error) {
       if (typeof solutionStartedAt === "number") {
@@ -191,7 +276,7 @@ async function runPythonUserCode(request) {
 
       try {
         const parsedInput = parseInputAssignments(testCase.input);
-        const expected = evaluateLiteral(testCase.expected);
+        const expected = parseExpectedOutput(testCase.expected);
         const callPlan = getPythonCallPlan(request.code, request.functionName, parsedInput);
         const returnKind = getStructuredKind(
           getPythonTypeHints(request.code, request.functionName).returnType,
@@ -213,11 +298,15 @@ async function runPythonUserCode(request) {
           ? compiled.serializeValue(outputProxy, returnKind)
           : outputProxy;
         const output = pythonValueToJs(serializedOutputProxy);
-        const memoryBytes = await measureMemoryBytes(memoryStartedBytes, output, [
+        const normalizedOutput =
+          expected.kind === "named"
+            ? buildNamedOutput(expected, output, serializePythonInput(compiled, args, callPlan))
+            : output;
+        const memoryBytes = await measureMemoryBytes(memoryStartedBytes, normalizedOutput, [
           parsedInput.values,
-          output,
+          normalizedOutput,
         ]);
-        const passed = compareValues(output, expected, request.judgeMode);
+        const passed = compareRunOutput(normalizedOutput, expected, request.judgeMode);
 
         cases.push({
           id: testCase.id,
@@ -226,8 +315,8 @@ async function runPythonUserCode(request) {
           durationMs,
           memoryBytes,
           inputText: testCase.input,
-          outputText: stringifyValue(output),
-          expectedText: stringifyValue(expected),
+          outputText: formatRunOutput(normalizedOutput, expected),
+          expectedText: formatExpectedOutput(expected),
         });
       } catch (error) {
         if (typeof solutionStartedAt === "number") {

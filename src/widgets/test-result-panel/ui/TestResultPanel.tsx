@@ -149,7 +149,7 @@ export function TestResultPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
-        <CheckSquare className="h-4 w-4 text-[var(--lc-success)]" />
+        <CheckSquare className="h-4 w-4 text-(--lc-success)" />
         <span>Test Result</span>
       </div>
 

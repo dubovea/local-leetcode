@@ -1,4 +1,7 @@
+import { stringifyValue, WILDCARD_VALUE } from "./runnerValue.js";
+
 const ASSIGNMENT_START_RE = /^[A-Za-z_$][\w$]*\s*=/;
+const IDENTIFIER_RE = /^[A-Za-z_$][\w$]*/;
 
 function cleanInputText(text) {
   return String(text ?? "")
@@ -15,7 +18,7 @@ export function cleanValueText(text) {
 }
 
 function readIdentifier(source, index) {
-  const match = /^[A-Za-z_$][\w$]*/.exec(source.slice(index));
+  const match = IDENTIFIER_RE.exec(source.slice(index));
 
   if (!match) {
     throw new Error(`Expected parameter name near: ${source.slice(index, index + 30)}`);
@@ -105,6 +108,88 @@ function findValueEnd(source, index) {
   return nextIndex;
 }
 
+function splitTopLevelCommaList(source) {
+  const parts = [];
+  let start = 0;
+  let depth = 0;
+  let quote = "";
+  let escaping = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+
+    if (quote) {
+      if (escaping) {
+        escaping = false;
+      } else if (char === "\\") {
+        escaping = true;
+      } else if (char === quote) {
+        quote = "";
+      }
+
+      continue;
+    }
+
+    if (char === '"' || char === "'" || char === "`") {
+      quote = char;
+      continue;
+    }
+
+    if (char === "[" || char === "{" || char === "(") {
+      depth += 1;
+      continue;
+    }
+
+    if (char === "]" || char === "}" || char === ")") {
+      depth -= 1;
+      continue;
+    }
+
+    if (char === "," && depth === 0) {
+      const part = source.slice(start, index).trim();
+
+      if (part) {
+        parts.push(part);
+      }
+
+      start = index + 1;
+    }
+  }
+
+  const tail = source.slice(start).trim();
+
+  if (tail) {
+    parts.push(tail);
+  }
+
+  return parts;
+}
+
+function readAssignmentPart(part) {
+  const identifierMatch = IDENTIFIER_RE.exec(part);
+
+  if (!identifierMatch) {
+    return null;
+  }
+
+  const identifier = { name: identifierMatch[0], nextIndex: identifierMatch[0].length };
+  const afterNameIndex = identifier.nextIndex;
+  let index = afterNameIndex;
+
+  while (index < part.length && /\s/.test(part[index])) {
+    index += 1;
+  }
+
+  if (part[index] !== "=") {
+    return null;
+  }
+
+  return {
+    name: identifier.name,
+    value: evaluateLiteral(part.slice(index + 1).trim()),
+  };
+}
+
 export function evaluateLiteral(valueText) {
   const cleanText = cleanValueText(valueText)
     .replace(/,\s*$/, "")
@@ -114,7 +199,80 @@ export function evaluateLiteral(valueText) {
     throw new Error("Expected a value, but got an empty string");
   }
 
-  return Function(`"use strict"; return (${cleanText});`)();
+  return Function("_", "nums", `"use strict"; return (${cleanText});`)(WILDCARD_VALUE);
+}
+
+export function parseExpectedOutput(expectedText) {
+  const source = cleanValueText(expectedText).replace(/;\s*$/, "");
+
+  if (!source) {
+    throw new Error("Expected a value, but got an empty string");
+  }
+
+  const parts = splitTopLevelCommaList(source);
+  const hasNamedPart = parts.some((part) => ASSIGNMENT_START_RE.test(part));
+
+  if (!hasNamedPart) {
+    return {
+      kind: "value",
+      value: evaluateLiteral(source),
+    };
+  }
+
+  const fields = [];
+  let hasReturn = false;
+  let returnValue;
+
+  for (const part of parts) {
+    const assignment = readAssignmentPart(part);
+
+    if (assignment) {
+      if (assignment.name === "return") {
+        hasReturn = true;
+        returnValue = assignment.value;
+      } else {
+        fields.push(assignment);
+      }
+
+      continue;
+    }
+
+    if (hasReturn) {
+      throw new Error(`Unexpected output part: ${part}`);
+    }
+
+    hasReturn = true;
+    returnValue = evaluateLiteral(part);
+  }
+
+  return {
+    kind: "named",
+    hasReturn,
+    returnValue,
+    fields,
+  };
+}
+
+export function formatNamedOutput(output) {
+  const parts = [];
+
+  if (output.hasReturn) {
+    parts.push(stringifyValue(output.returnValue));
+  }
+
+  for (const field of output.fields) {
+    parts.push(`${field.name} = ${stringifyValue(field.value)}`);
+  }
+
+  return parts.join(", ");
+}
+
+export function formatExpectedOutput(expected) {
+  if (expected.kind === "named") {
+    return formatNamedOutput(expected);
+  }
+
+  return stringifyValue(expected.value);
 }
 
 export function parseInputAssignments(inputText) {

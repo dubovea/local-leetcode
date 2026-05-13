@@ -320,11 +320,28 @@ export function transformInputJS(values, code, names = []) {
   });
 }
 
+export function serializeInputJS(values, code, names = []) {
+  const typeHints = getJsTypeHints(code);
+  const useFunctionParamOrder = typeHints.params.length > 0 && names.length > 0;
+  const outputNames = useFunctionParamOrder ? typeHints.params.map((hint) => hint.name) : names;
+  const outputValues = values.map((value, index) => {
+    const hint = useFunctionParamOrder
+      ? typeHints.params[index]
+      : typeHints.params.find((param) => param.name === names[index]) ?? typeHints.params[index];
+
+    return hint ? serializeStructuredValue(value, hint.type, code) : value;
+  });
+
+  return { names: outputNames, values: outputValues };
+}
+
 export function transformOutputJS(value, code, fallbackValue) {
-  const { returnType } = getJsTypeHints(code);
+  const { params, returnType } = getJsTypeHints(code);
 
   if (returnType === "void") {
-    return serializeStructuredValue(fallbackValue, getJsTypeHints(code).params[0]?.type, code);
+    return typeof fallbackValue === "undefined"
+      ? undefined
+      : serializeStructuredValue(fallbackValue, params[0]?.type, code);
   }
 
   return serializeStructuredValue(value, returnType, code);
