@@ -536,6 +536,29 @@ assert(
   "memory usage should grow for larger retained output",
 );
 
+const smallTemporaryMemory = await runUserCode({
+  code: "var memoryProbe = function () { return 1; };",
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "1" }],
+});
+const largeTemporaryMemory = await runUserCode({
+  code: `var memoryProbe = function () {
+  const values = Array.from({ length: 5000 }, (_, index) => index);
+  const seen = new Map(values.map((value) => [value, value]));
+
+  return seen.get(1);
+};`,
+  functionName: "memoryProbe",
+  judgeMode: "exact",
+  testCases: [{ id: "1", input: "", expected: "1" }],
+});
+
+assert(
+  largeTemporaryMemory.memoryBytes > smallTemporaryMemory.memoryBytes,
+  "memory usage should include tracked temporary Array/Map allocations",
+);
+
 const originalMemoryDescriptor = Object.getOwnPropertyDescriptor(performance, "memory");
 
 Object.defineProperty(performance, "memory", {

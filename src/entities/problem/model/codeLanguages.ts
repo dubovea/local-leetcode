@@ -23,34 +23,34 @@ export const codeLanguageOptions: Array<{
     extension: "py",
     tabSize: 4,
   },
-  {
-    value: "c-wasm",
-    label: "C (WASM)",
-    monacoLanguage: "c",
-    extension: "c",
-    tabSize: 4,
-  },
-  {
-    value: "csharp-wasm",
-    label: "C# (WASM)",
-    monacoLanguage: "csharp",
-    extension: "cs",
-    tabSize: 4,
-  },
-  {
-    value: "cpp-wasm",
-    label: "C++ (WASM)",
-    monacoLanguage: "cpp",
-    extension: "cpp",
-    tabSize: 4,
-  },
-  {
-    value: "go-wasm",
-    label: "GoLang (WASM)",
-    monacoLanguage: "go",
-    extension: "go",
-    tabSize: 4,
-  },
+  // {
+  //   value: "c-wasm",
+  //   label: "C (WASM)",
+  //   monacoLanguage: "c",
+  //   extension: "c",
+  //   tabSize: 4,
+  // },
+  // {
+  //   value: "csharp-wasm",
+  //   label: "C# (WASM)",
+  //   monacoLanguage: "csharp",
+  //   extension: "cs",
+  //   tabSize: 4,
+  // },
+  // {
+  //   value: "cpp-wasm",
+  //   label: "C++ (WASM)",
+  //   monacoLanguage: "cpp",
+  //   extension: "cpp",
+  //   tabSize: 4,
+  // },
+  // {
+  //   value: "go-wasm",
+  //   label: "GoLang (WASM)",
+  //   monacoLanguage: "go",
+  //   extension: "go",
+  //   tabSize: 4,
+  // },
 ];
 
 const languageConfigByValue = new Map(

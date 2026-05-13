@@ -545,19 +545,18 @@ export function ProblemListDrawer({
               </FilterButton>
 
               <FilterButton
-                active={statusFilter === "unsolved"}
-                title={statusFilterTitle.unsolved}
-                onClick={() => setStatusFilter("unsolved")}
-              >
-                <Circle className="h-4 w-4" />
-              </FilterButton>
-
-              <FilterButton
                 active={statusFilter === "solved"}
                 title={statusFilterTitle.solved}
                 onClick={() => setStatusFilter("solved")}
               >
                 <CheckCircle2 className="h-4 w-4" />
+              </FilterButton>
+              <FilterButton
+                active={statusFilter === "unsolved"}
+                title={statusFilterTitle.unsolved}
+                onClick={() => setStatusFilter("unsolved")}
+              >
+                <Circle className="h-4 w-4" />
               </FilterButton>
             </div>
           </div>

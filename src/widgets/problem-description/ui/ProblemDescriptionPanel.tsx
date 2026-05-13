@@ -83,11 +83,11 @@ function HintsHover({ hints }: { hints: string[] }) {
         type="button"
       >
         <Lightbulb className="h-4 w-4" />
-        Hints
+        Подсказки
       </button>
 
       <div className="pointer-events-none absolute right-0 top-full z-30 mt-2 hidden w-96 max-w-[calc(100vw-48px)] rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-3 text-xs text-[var(--lc-text)] shadow-xl group-hover/hints:block group-focus-within/hints:block">
-        <div className="mb-2 font-semibold text-[var(--lc-text-strong)]">Hints</div>
+        <div className="mb-2 font-semibold text-[var(--lc-text-strong)]">Подсказки</div>
         <ol className="space-y-2">
           {hints.map((hint, index) => (
             <li key={`${index}-${hint}`} className="leading-5">
@@ -181,6 +181,8 @@ export const ProblemDescriptionPanel = memo(
               </TabsTrigger>
             </TabsList>
 
+            <HintsHover hints={hints} />
+
             {solved ? (
               <div className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-semibold text-[var(--lc-success)]">
                 <CheckCircle2 className="h-4 w-4" />
@@ -211,8 +213,6 @@ export const ProblemDescriptionPanel = memo(
                       ))}
                     </div>
                   </div>
-
-                  <HintsHover hints={hints} />
 
                   <Button variant="ghost" onClick={() => setEditingMarkdown((value) => !value)}>
                     <EditIcon className="h-4 w-4" />
