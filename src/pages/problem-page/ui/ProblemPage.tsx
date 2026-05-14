@@ -24,7 +24,7 @@ import { ProblemDescriptionPanel } from "@/widgets/problem-description/ui/Proble
 import { CodeWorkspace } from "@/widgets/code-workspace/ui/CodeWorkspace";
 import { UserDashboardPage } from "@/widgets/user-dashboard/ui/UserDashboardPage";
 
-type BottomTab = "testcase" | "result";
+type BottomTab = "testcase" | "result" | "console";
 type AppTheme = "dark" | "light";
 
 const PRACTICE_HISTORY_PATH = "/practice-history";
@@ -262,7 +262,7 @@ export function ProblemPage() {
       }
 
       setRunning(true);
-      setBottomTab("result");
+      setBottomTab((tab) => (tab === "console" ? "console" : "result"));
 
       const result = await runInWorker({
         code,

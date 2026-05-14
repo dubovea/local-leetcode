@@ -1,4 +1,4 @@
-import { CheckCircle2, CheckSquare, Circle, XCircle } from "lucide-react";
+import { CheckCircle2, Circle, FileText, Terminal, XCircle } from "lucide-react";
 import type {
   CaseRunResult,
   ConsoleLog,
@@ -16,27 +16,28 @@ function firstFailedCase(cases: CaseRunResult[]) {
 }
 
 function Logs({ logs }: { logs: ConsoleLog[] }) {
-  if (logs.length === 0) {
-    return null;
-  }
-
   return (
-    <div className="mt-4">
-      <div className="mb-2 text-xs font-semibold text-[var(--lc-muted)]">Console</div>
-      <div className="max-h-40 overflow-auto rounded-lg bg-[var(--lc-code)] p-3 font-mono text-xs">
-        {logs.map((log, index) => (
-          <div
-            key={index}
-            className={cn(
-              "whitespace-pre-wrap leading-5",
-              log.type === "error" ? "text-[var(--lc-danger-text)]" : "text-[var(--lc-text)]",
-            )}
-          >
-            {log.text}
-          </div>
-        ))}
-      </div>
+    <div className="rounded-lg bg-[var(--lc-code)] p-3 font-mono text-xs">
+      {logs.map((log, index) => (
+        <div
+          key={index}
+          className={cn(
+            "whitespace-pre-wrap leading-5",
+            log.type === "error" ? "text-[var(--lc-danger-text)]" : "text-[var(--lc-text)]",
+          )}
+        >
+          {log.type === "log" ? log.text : `[${log.type}] ${log.text}`}
+        </div>
+      ))}
     </div>
+  );
+}
+
+function ErrorBlock({ errorText }: { errorText: string }) {
+  return (
+    <pre className="mt-3 overflow-auto rounded-lg bg-[var(--lc-danger-soft)] p-3 font-mono text-xs leading-5 text-[var(--lc-danger-text)]">
+      {errorText}
+    </pre>
   );
 }
 
@@ -125,8 +126,8 @@ export function TestResultPanel({
     return (
       <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
         <div className="flex h-11 shrink-0 items-center border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
-          <CheckSquare className="mr-2 h-4 w-4 text-[var(--lc-success)]" />
-          Testcase
+          <FileText className="mr-2 h-4 w-4 text-[var(--lc-success)]" />
+          Test Result
         </div>
         <CaseTabs
           cases={testCases}
@@ -149,7 +150,7 @@ export function TestResultPanel({
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
       <div className="flex h-11 shrink-0 items-center gap-3 border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
-        <CheckSquare className="h-4 w-4 text-(--lc-success)" />
+        <FileText className="h-4 w-4 text-[var(--lc-success)]" />
         <span>Test Result</span>
       </div>
 
@@ -193,8 +194,66 @@ export function TestResultPanel({
             </>
           ) : null}
 
-          <Logs logs={result.logs} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ConsoleCaseSection({ testCase, index }: { testCase: CaseRunResult; index: number }) {
+  const logs = testCase.logs ?? [];
+  const ResultIcon = testCase.passed ? CheckCircle2 : XCircle;
+
+  return (
+    <section className="border-b border-[var(--lc-border)] py-4 first:pt-0 last:border-b-0 last:pb-0">
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[var(--lc-text-strong)]">
+        <ResultIcon
+          className={cn(
+            "h-4 w-4",
+            testCase.passed ? "text-[var(--lc-success)]" : "text-[var(--lc-danger-strong)]",
+          )}
+        />
+        {testCase.name || `Case ${index + 1}`}
+      </div>
+
+      {logs.length > 0 ? (
+        <Logs logs={logs} />
+      ) : (
+        <div className="rounded-lg bg-[var(--lc-code)] p-3 font-mono text-xs leading-5 text-[var(--lc-muted)]">
+          No console output
+        </div>
+      )}
+
+      {testCase.errorText ? <ErrorBlock errorText={testCase.errorText} /> : null}
+    </section>
+  );
+}
+
+export function ConsoleLogPanel({ result }: { result: RunResult | null }) {
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--lc-panel)]">
+      <div className="flex h-11 shrink-0 items-center border-b border-[var(--lc-border)] px-3 text-sm font-medium text-[var(--lc-text)]">
+        <Terminal className="mr-2 h-4 w-4 text-[var(--lc-success)]" />
+        Console
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        {result ? (
+          <>
+            {result.cases.length > 0 ? (
+              result.cases.map((testCase, index) => (
+                <ConsoleCaseSection key={testCase.id} index={index} testCase={testCase} />
+              ))
+            ) : result.logs.length > 0 ? (
+              <Logs logs={result.logs} />
+            ) : null}
+
+            {result.errorText ? <ErrorBlock errorText={result.errorText} /> : null}
+          </>
+        ) : (
+          <div className="rounded-lg bg-[var(--lc-code)] p-3 font-mono text-xs leading-5 text-[var(--lc-muted)]">
+            No console output
+          </div>
+        )}
       </div>
     </div>
   );

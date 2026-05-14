@@ -39,6 +39,7 @@ export type CaseRunResult = {
   passed: boolean;
   durationMs: number;
   memoryBytes?: number;
+  logs?: ConsoleLog[];
   inputText: string;
   outputText: string;
   expectedText: string;

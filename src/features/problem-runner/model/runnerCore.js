@@ -170,7 +170,8 @@ function serializePythonInput(compiled, args, callPlan) {
 async function runJavaScriptUserCode(request) {
   const logs = [];
   const totalStartedAt = nowMs();
-  const consoleApi = createConsole(logs);
+  let activeLogs = logs;
+  const consoleApi = createConsole(() => activeLogs);
   const cases = [];
 
   let compiled;
@@ -183,10 +184,12 @@ async function runJavaScriptUserCode(request) {
 
   for (let index = 0; index < request.testCases.length; index += 1) {
     const testCase = request.testCases[index];
+    const caseLogs = [];
     let durationMs = 0;
     let solutionStartedAt;
 
     try {
+      activeLogs = caseLogs;
       const parsedInput = parseInputAssignments(testCase.input);
       const expected = parseExpectedOutput(testCase.expected);
       const designCase = readDesignCase(parsedInput);
@@ -223,6 +226,7 @@ async function runJavaScriptUserCode(request) {
         passed,
         durationMs,
         memoryBytes,
+        logs: caseLogs,
         inputText: testCase.input,
         outputText: formatRunOutput(normalizedOutput, expected),
         expectedText: formatExpectedOutput(expected),
@@ -237,11 +241,15 @@ async function runJavaScriptUserCode(request) {
         name: `Case ${index + 1}`,
         passed: false,
         durationMs,
+        logs: caseLogs,
         inputText: testCase.input,
         outputText: "",
         expectedText: cleanValueText(testCase.expected),
         errorText: formatError(error),
       });
+    } finally {
+      logs.push(...caseLogs);
+      activeLogs = logs;
     }
   }
 
@@ -267,6 +275,7 @@ async function runPythonUserCode(request) {
   try {
     for (let index = 0; index < request.testCases.length; index += 1) {
       const testCase = request.testCases[index];
+      const caseLogs = [];
       let durationMs = 0;
       let solutionStartedAt;
       let outputProxy;
@@ -275,6 +284,7 @@ async function runPythonUserCode(request) {
       const rawArgProxies = [];
 
       try {
+        setPythonLogsTarget(caseLogs);
         const parsedInput = parseInputAssignments(testCase.input);
         const expected = parseExpectedOutput(testCase.expected);
         const callPlan = getPythonCallPlan(request.code, request.functionName, parsedInput);
@@ -314,6 +324,7 @@ async function runPythonUserCode(request) {
           passed,
           durationMs,
           memoryBytes,
+          logs: caseLogs,
           inputText: testCase.input,
           outputText: formatRunOutput(normalizedOutput, expected),
           expectedText: formatExpectedOutput(expected),
@@ -328,12 +339,16 @@ async function runPythonUserCode(request) {
           name: `Case ${index + 1}`,
           passed: false,
           durationMs,
+          logs: caseLogs,
           inputText: testCase.input,
           outputText: "",
           expectedText: cleanValueText(testCase.expected),
           errorText: formatError(error),
         });
       } finally {
+        logs.push(...caseLogs);
+        setPythonLogsTarget(logs);
+
         if (serializedOutputProxy !== outputProxy) {
           destroyPyProxy(serializedOutputProxy);
         }

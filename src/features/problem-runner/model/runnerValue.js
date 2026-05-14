@@ -172,7 +172,9 @@ export function formatError(error) {
 export function createConsole(logs) {
   return ["log", "warn", "error", "table"].reduce((consoleApi, type) => {
     consoleApi[type] = (...args) => {
-      logs.push({
+      const targetLogs = typeof logs === "function" ? logs() : logs;
+
+      targetLogs.push({
         type,
         text: args.map(formatValue).join(" "),
       });

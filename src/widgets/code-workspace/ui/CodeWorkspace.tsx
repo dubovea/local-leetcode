@@ -1,15 +1,21 @@
-import { AlertCircle, CheckSquare, Code2, FileText, RotateCcw } from "lucide-react";
+import { AlertCircle, CheckSquare, Code2, FileText, RotateCcw, Terminal } from "lucide-react";
 import type { CodeLanguage, Problem, RunResult, TestCase } from "@/entities/problem/model/types";
 import { codeLanguageOptions } from "@/entities/problem/model/codeLanguages";
 import { SolutionEditor } from "@/features/problem-editor/ui/SolutionEditor";
 import { TestcaseEditor } from "@/features/testcases/ui/TestcaseEditor";
-import { TestResultPanel } from "@/widgets/test-result-panel/ui/TestResultPanel";
+import {
+  ConsoleLogPanel,
+  TestResultPanel,
+} from "@/widgets/test-result-panel/ui/TestResultPanel";
 import { Tabs, TabsList, TabsTrigger } from "@/shared/ui/tabs";
 import { Button } from "@/shared/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/shared/ui/select";
 
-type BottomTab = "testcase" | "result";
+type BottomTab = "testcase" | "result" | "console";
 type AppTheme = "dark" | "light";
+
+const bottomTabTriggerClassName =
+  "h-8 rounded-md px-3 text-xs font-medium leading-none text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]";
 
 export function CodeWorkspace({
   problem,
@@ -120,19 +126,17 @@ export function CodeWorkspace({
         <div className="flex h-11 items-center justify-between border-b border-[var(--lc-border)] bg-[var(--lc-panel-header)] px-3">
           <Tabs value={bottomTab} onValueChange={(value) => onBottomTabChange(value as BottomTab)}>
             <TabsList className="h-8 bg-transparent p-0" variant="line">
-              <TabsTrigger
-                className="h-8 rounded-md px-3 text-xs text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"
-                value="testcase"
-              >
+              <TabsTrigger className={bottomTabTriggerClassName} value="testcase">
                 <CheckSquare className="h-4 w-4" />
                 Testcase
               </TabsTrigger>
-              <TabsTrigger
-                className="h-8 rounded-md px-3 text-xs text-[var(--lc-muted)] data-active:bg-[var(--lc-active)] data-active:text-[var(--lc-text-strong)]"
-                value="result"
-              >
+              <TabsTrigger className={bottomTabTriggerClassName} value="result">
                 <FileText className="h-4 w-4" />
                 Test Result
+              </TabsTrigger>
+              <TabsTrigger className={bottomTabTriggerClassName} value="console">
+                <Terminal className="h-4 w-4" />
+                Console
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -145,13 +149,15 @@ export function CodeWorkspace({
               onActiveCaseChange={onActiveCaseChange}
               onChange={updateTestCases}
             />
-          ) : (
+          ) : bottomTab === "result" ? (
             <TestResultPanel
               activeCaseId={activeCaseId}
               result={result}
               testCases={problem.testCases}
               onActiveCaseChange={onActiveCaseChange}
             />
+          ) : (
+            <ConsoleLogPanel result={result} />
           )}
         </div>
       </div>
