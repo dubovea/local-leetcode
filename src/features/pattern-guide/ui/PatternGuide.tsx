@@ -7,22 +7,20 @@ import { Button } from "@/shared/ui/button";
 import { cn } from "@/shared/lib/cn";
 
 type PatternVisualType =
-  | "prefix"
-  | "pointers"
   | "window"
+  | "pointers"
   | "fast-slow"
-  | "reverse"
-  | "stack"
-  | "top-k"
   | "intervals"
+  | "cyclic"
+  | "reverse"
+  | "tree-bfs"
+  | "tree-dfs"
+  | "two-heaps"
+  | "subsets"
   | "binary-search"
-  | "tree"
-  | "dfs"
-  | "bfs"
-  | "matrix"
-  | "backtracking"
-  | "dp"
-  | "bits";
+  | "top-k"
+  | "k-way"
+  | "topological";
 
 type Pattern = {
   title: string;
@@ -39,54 +37,185 @@ type ProblemLookup = {
   compact: Map<string, ProblemListItem>;
 };
 
+const articlePatternDetails: Record<
+  string,
+  {
+    original: string;
+    details: string[];
+  }
+> = {
+  "Скользящее окно": {
+    original: "Sliding Window",
+    details: [
+      "Главная идея: не пересчитывать подмассив или подстроку заново, а поддерживать состояние текущего окна.",
+      "Размер окна может быть фиксированным или динамическим: в динамическом варианте окно расширяется и сжимается по условию.",
+      "На интервью сначала проговори, что именно хранит окно: сумму, частоты, количество ошибок, уникальные символы или текущую длину.",
+    ],
+  },
+  "Два указателя": {
+    original: "Two Pointers or Iterators",
+    details: [
+      "Паттерн заменяет вложенный перебор пар одним проходом, когда порядок данных помогает выбрать движение указателей.",
+      "Чаще всего указатели сходятся с двух концов, но иногда один указатель читает данные, а второй пишет результат.",
+      "Перед кодом полезно явно сказать, почему движение одного указателя не пропускает оптимальный ответ.",
+    ],
+  },
+  "Быстрый и медленный указатели": {
+    original: "Fast and Slow Pointers or Iterators",
+    details: [
+      "Это тот самый hare and tortoise: два бегуна по одной структуре, но с разной скоростью.",
+      "Если есть цикл, быстрый указатель неизбежно догонит медленный; если цикла нет, он дойдет до конца.",
+      "При поиске середины списка slow обычно указывает на середину ровно тогда, когда fast дошел до хвоста.",
+    ],
+  },
+  "Слияние интервалов": {
+    original: "Merge Intervals",
+    details: [
+      "Паттерн появляется в задачах про расписания, встречи, бронирования, занятость ресурсов и пересекающиеся диапазоны.",
+      "Сортировка по началу превращает хаос интервалов в один линейный проход.",
+      "Самая частая ошибка: неверно обработать касание границ, когда [1, 3] и [3, 5] считаются пересекающимися или нет по условию.",
+    ],
+  },
+  "Циклическая сортировка": {
+    original: "Cyclic Sort",
+    details: [
+      "Работает, когда значения сами подсказывают, на каком индексе должны стоять.",
+      "Вместо полноценной сортировки мы отправляем каждое число на его место, пока это возможно и безопасно.",
+      "Обязательно проверяй границы и дубликаты, иначе swap может уйти в бесконечный цикл.",
+    ],
+  },
+  "Разворот связного списка на месте": {
+    original: "In-place Reversal of a Linked List",
+    details: [
+      "Задачи этого типа проверяют, умеешь ли ты безопасно менять ссылки без потери хвоста списка.",
+      "Минимальный набор переменных: previous, current и next; порядок присваиваний здесь важнее всего.",
+      "Для разворота подсписка или групп по k сначала отдели границы, затем применяй тот же маленький разворот.",
+    ],
+  },
+  "Обход дерева в ширину": {
+    original: "Tree BFS",
+    details: [
+      "BFS естественно группирует узлы по расстоянию от корня, поэтому подходит для задач по уровням.",
+      "Очередь хранит фронт обхода, а фиксированный levelSize не дает смешать соседние уровни.",
+      "Если задача спрашивает ближайший узел или минимальную глубину, BFS часто завершает поиск раньше DFS.",
+    ],
+  },
+  "Обход дерева в глубину": {
+    original: "Tree DFS",
+    details: [
+      "DFS удобен, когда ответ живет в пути, поддереве или вычисляется снизу вверх.",
+      "Выбор preorder, inorder или postorder зависит от момента, когда нужны данные текущего узла.",
+      "Если передаешь mutable path, не забывай откатывать изменения после рекурсивного вызова.",
+    ],
+  },
+  "Две кучи": {
+    original: "Two Heaps",
+    details: [
+      "Паттерн делит поток данных на две половины: меньшую и большую.",
+      "Max-heap хранит левую половину, min-heap правую; вершины дают быстрый доступ к середине.",
+      "После каждой вставки нужно балансировать размеры, иначе медиана начнет считаться из неверной половины.",
+    ],
+  },
+  "Подмножества": {
+    original: "Subsets",
+    details: [
+      "Это паттерн полного перебора пространства решений: включить или не включить, выбрать следующий символ, поменять порядок.",
+      "Код обычно строится вокруг path и result, где path изменяется на месте и откатывается назад.",
+      "Дубликаты требуют отдельного правила: сортировка плюс пропуск одинаковых кандидатов на одном уровне дерева решений.",
+    ],
+  },
+  "Модифицированный бинарный поиск": {
+    original: "Modified Binary Search",
+    details: [
+      "Смысл не только в отсортированном массиве, а в монотонном признаке: левее false, правее true или наоборот.",
+      "Повернутый массив, поиск границы, минимум, пик и ответ по диапазону сводятся к одному шаблону с разными условиями.",
+      "Самая важная часть решения - четко определить, какая половина точно больше не нужна.",
+    ],
+  },
+  "Top K элементов": {
+    original: "Top K Elements",
+    details: [
+      "Если нужен только небольшой набор лучших элементов, полная сортировка часто избыточна.",
+      "Min-heap размера k хранит текущих победителей и быстро выбрасывает слабейшего кандидата.",
+      "Если k близко к n или вход маленький, сортировка может быть проще и достаточно хороша.",
+    ],
+  },
+  "K-way merge": {
+    original: "K-way Merge",
+    details: [
+      "Паттерн объединяет несколько уже отсортированных источников без полной пересортировки всех элементов.",
+      "В куче лежит только текущий кандидат из каждого списка, поэтому память зависит от количества списков.",
+      "Каждый извлеченный элемент сам подсказывает, из какого источника нужно взять следующий.",
+    ],
+  },
+  "Топологическая сортировка": {
+    original: "Topological Sort",
+    details: [
+      "Используется для направленных графов зависимостей: сначала должны идти элементы без незакрытых prerequisites.",
+      "Kahn's algorithm через indegree удобен, когда нужно получить порядок или обнаружить цикл.",
+      "Если после обработки очереди посещены не все вершины, значит в зависимостях есть цикл.",
+    ],
+  },
+};
+
 const patterns: Pattern[] = [
   {
-    title: "Префиксные суммы",
-    visual: "prefix",
-    signal: "Есть много запросов суммы на отрезке или нужны накопительные значения по массиву.",
+    title: "Скользящее окно",
+    visual: "window",
+    signal:
+      "В условии есть непрерывный подмассив или подстрока, а ответ зависит от суммы, частот, длины или валидности текущего отрезка.",
     approach:
-      "Один раз построй массив префиксов, а затем отвечай на каждый запрос вычитанием двух значений.",
-    complexity: "Построение O(n), запрос O(1), память O(n).",
-    code: `function rangeSum(nums, left, right) {
-  // Пример: nums = [2, 1, 5, 3], left = 1, right = 3.
-  // Хотим быстро получить сумму nums[1] + nums[2] + nums[3] = 9.
-  // prefix[i] хранит сумму первых i элементов, поэтому prefix[0] = 0.
-  const prefix = [0];
+      "Двигай правую границу окна, добавляй новый элемент в состояние, а левую границу сдвигай только тогда, когда окно стало слишком большим или нарушило правило.",
+    complexity: "Обычно O(n) по времени и O(1) или O(k) по памяти, потому что обе границы идут только вперед.",
+    code: `function longestUniqueSubstring(text) {
+  // Ищем самую длинную подстроку без повторяющихся символов.
+  // left - начало текущего окна, seen хранит последнюю позицию каждого символа.
+  const seen = new Map();
+  let left = 0;
+  let best = 0;
 
-  for (const num of nums) {
-    // На каждом шаге добавляем текущий элемент к уже известной сумме.
-    prefix.push(prefix[prefix.length - 1] + num);
+  for (let right = 0; right < text.length; right += 1) {
+    const char = text[right];
+
+    // Если символ уже внутри окна, двигаем левую границу за прошлое вхождение.
+    if (seen.has(char) && seen.get(char) >= left) {
+      left = seen.get(char) + 1;
+    }
+
+    seen.set(char, right);
+    best = Math.max(best, right - left + 1);
   }
 
-  // Сумма от left до right равна сумме первых right + 1 элементов
-  // без суммы элементов, стоящих до left.
-  return prefix[right + 1] - prefix[left];
+  return best;
 }`,
-    problems: ["Range Sum Query - Immutable", "Subarray Sum Equals K", "Continuous Subarray Sum"],
+    problems: [
+      "Maximum Average Subarray I",
+      "Longest Substring Without Repeating Characters",
+      "Permutation in String",
+      "Minimum Window Substring",
+    ],
   },
   {
     title: "Два указателя",
     visual: "pointers",
-    signal: "Отсортированные массивы, пары значений, палиндромы или фильтрация с двух концов.",
+    signal:
+      "Данные отсортированы, нужно найти пару, удалить дубликаты, проверить палиндром или сравнивать элементы с двух сторон.",
     approach:
-      "Двигай тот указатель, который приближает состояние к цели, и остановись, когда указатели пересекутся.",
-    complexity: "Обычно O(n) по времени и O(1) по памяти.",
-    code: `function twoSumSorted(nums, target) {
-  // Пример: nums = [1, 2, 4, 6, 8], target = 10.
-  // Массив отсортирован, значит можно смотреть на самую маленькую
-  // и самую большую кандидатуры одновременно.
+      "Поставь указатели на разные концы или на две позиции одного массива. На каждом шаге двигай тот указатель, который приближает состояние к цели.",
+    complexity: "Чаще всего O(n) по времени и O(1) по памяти.",
+    code: `function twoSumSorted(numbers, target) {
+  // Массив уже отсортирован, поэтому сумма управляет движением указателей.
   let left = 0;
-  let right = nums.length - 1;
+  let right = numbers.length - 1;
 
   while (left < right) {
-    const sum = nums[left] + nums[right];
+    const sum = numbers[left] + numbers[right];
 
-    // Если сумма совпала, оба указателя стоят на ответе.
     if (sum === target) return [left, right];
 
-    // Сумма мала: увеличиваем её, двигая левый указатель вправо.
+    // Сумма мала - нужен элемент больше, двигаем left.
     if (sum < target) left += 1;
-    // Сумма велика: уменьшаем её, двигая правый указатель влево.
+    // Сумма велика - нужен элемент меньше, двигаем right.
     else right -= 1;
   }
 
@@ -96,52 +225,20 @@ const patterns: Pattern[] = [
       "Two Sum II - Input Array Is Sorted",
       "3Sum",
       "Container With Most Water",
+      "Squares of a Sorted Array",
       "Valid Palindrome",
-    ],
-  },
-  {
-    title: "Скользящее окно",
-    visual: "window",
-    signal:
-      "Нужен непрерывный подмассив или подстрока с максимумом, минимумом, счётчиком или условием валидности.",
-    approach:
-      "Расширяй правую границу, сжимай левую, когда окно нарушает правило, и обновляй ответ.",
-    complexity: "O(n), потому что каждая граница движется вперёд не больше n раз.",
-    code: `function maxSumOfSizeK(nums, k) {
-  // Пример: nums = [2, 1, 5, 1, 3, 2], k = 3.
-  // Окно всегда содержит ровно k элементов, а sum хранит их сумму.
-  let sum = 0;
-  let best = -Infinity;
-
-  for (let right = 0; right < nums.length; right += 1) {
-    // Добавляем новый правый элемент в окно.
-    sum += nums[right];
-
-    // Если окно стало больше k, убираем элемент, который вышел слева.
-    if (right >= k) sum -= nums[right - k];
-
-    // Когда окно достигло размера k, обновляем лучший ответ.
-    if (right >= k - 1) best = Math.max(best, sum);
-  }
-
-  return best;
-}`,
-    problems: [
-      "Maximum Average Subarray I",
-      "Longest Substring Without Repeating Characters",
-      "Longest Repeating Character Replacement",
-      "Minimum Window Substring",
     ],
   },
   {
     title: "Быстрый и медленный указатели",
     visual: "fast-slow",
-    signal: "Нужно найти цикл, середину списка или поведение последовательности с O(1) памяти.",
-    approach: "Один указатель двигается на шаг, второй на два; встреча обычно доказывает цикл.",
+    signal:
+      "Нужно найти цикл, середину списка, точку входа в цикл или повторяющееся значение при ограниченной памяти.",
+    approach:
+      "Один указатель идет на один шаг, второй на два. Если структура циклическая, они встретятся; если нет, быстрый дойдет до конца.",
     complexity: "O(n) по времени и O(1) по памяти.",
     code: `function hasCycle(head) {
-  // Пример: 3 -> 2 -> 0 -> -4, где -4 снова указывает на 2.
-  // slow делает один шаг, fast делает два шага.
+  // Floyd cycle detection: slow идет по одному узлу, fast - по два.
   let slow = head;
   let fast = head;
 
@@ -149,46 +246,103 @@ const patterns: Pattern[] = [
     slow = slow.next;
     fast = fast.next.next;
 
-    // Если цикл есть, быстрый указатель догонит медленный внутри цикла.
     if (slow === fast) return true;
   }
 
-  // Если fast дошёл до конца, цикла нет.
   return false;
 }`,
     problems: [
       "Linked List Cycle",
-      "Linked List Cycle II",
       "Happy Number",
+      "Middle of the Linked List",
       "Find the Duplicate Number",
+    ],
+  },
+  {
+    title: "Слияние интервалов",
+    visual: "intervals",
+    signal:
+      "В задаче есть промежутки времени, диапазоны, бронирования, пересечения или необходимость объединить конфликтующие отрезки.",
+    approach:
+      "Отсортируй интервалы по началу. Затем храни последний добавленный интервал и либо расширяй его, либо начинай новый.",
+    complexity: "O(n log n) из-за сортировки и O(n) памяти на результат.",
+    code: `function mergeIntervals(intervals) {
+  intervals.sort((a, b) => a[0] - b[0]);
+  const merged = [];
+
+  for (const interval of intervals) {
+    const last = merged[merged.length - 1];
+
+    if (!last || last[1] < interval[0]) {
+      merged.push([...interval]);
+    } else {
+      last[1] = Math.max(last[1], interval[1]);
+    }
+  }
+
+  return merged;
+}`,
+    problems: [
+      "Merge Intervals",
+      "Insert Interval",
+      "Interval List Intersections",
+      "Non-overlapping Intervals",
+    ],
+  },
+  {
+    title: "Циклическая сортировка",
+    visual: "cyclic",
+    signal:
+      "Массив содержит числа из небольшого диапазона, часто от 1 до n, и нужно найти пропуск, дубликат или первое отсутствующее положительное число.",
+    approach:
+      "Пока значение можно поставить на его естественный индекс, меняй элементы местами. После этого один проход покажет, где число не на своей позиции.",
+    complexity: "O(n) по времени и O(1) по памяти, потому что каждый swap ставит хотя бы одно число на место.",
+    code: `function findMissingNumber(nums) {
+  // nums содержит числа от 0 до n, одно число пропущено.
+  let i = 0;
+
+  while (i < nums.length) {
+    const correctIndex = nums[i];
+
+    if (nums[i] < nums.length && nums[i] !== nums[correctIndex]) {
+      [nums[i], nums[correctIndex]] = [nums[correctIndex], nums[i]];
+    } else {
+      i += 1;
+    }
+  }
+
+  for (let index = 0; index < nums.length; index += 1) {
+    if (nums[index] !== index) return index;
+  }
+
+  return nums.length;
+}`,
+    problems: [
+      "Missing Number",
+      "Find All Numbers Disappeared in an Array",
+      "Find the Duplicate Number",
+      "First Missing Positive",
     ],
   },
   {
     title: "Разворот связного списка на месте",
     visual: "reverse",
     signal:
-      "Нужно развернуть список, подсписок, пары или группы без дополнительной структуры данных.",
-    approach: "Храни previous, current и next; на каждом шаге перенаправляй current.next назад.",
+      "Нужно развернуть весь список, часть списка, пары, группы по k или переставить ссылки без дополнительной структуры.",
+    approach:
+      "Храни previous, current и next. На каждом шаге перенаправляй current.next назад, затем сдвигай все три ссылки вперед.",
     complexity: "O(n) по времени и O(1) по памяти.",
     code: `function reverseList(head) {
-  // Пример: 1 -> 2 -> 3 станет 3 -> 2 -> 1.
-  // previous хранит уже развёрнутую часть списка.
   let previous = null;
   let current = head;
 
   while (current) {
-    // Сохраняем следующий узел, иначе потеряем хвост списка.
     const next = current.next;
-
-    // Разворачиваем связь текущего узла назад.
     current.next = previous;
-
-    // Сдвигаем окно из двух указателей на один узел вперёд.
     previous = current;
     current = next;
   }
 
-  // previous теперь указывает на новую голову.
   return previous;
 }`,
     problems: [
@@ -199,112 +353,197 @@ const patterns: Pattern[] = [
     ],
   },
   {
-    title: "Монотонный стек",
-    visual: "stack",
-    signal: "Следующий больший/меньший элемент, границы гистограммы, span или ближайший блокер.",
+    title: "Обход дерева в ширину",
+    visual: "tree-bfs",
+    signal:
+      "Нужно обработать дерево по уровням: level order, среднее на уровне, минимальная глубина или ближайший подходящий узел.",
     approach:
-      "Поддерживай значения в стеке упорядоченными; доставай элементы, когда текущий элемент даёт для них ответ.",
-    complexity: "O(n) по времени и O(n) по памяти.",
-    code: `function nextGreater(nums) {
-  // Пример: nums = [2, 1, 2, 4, 3].
-  // Для каждого индекса ищем ближайшее число справа, которое больше него.
-  const answer = Array(nums.length).fill(-1);
-  const stack = []; // храним индексы, для которых ответ ещё не найден
+      "Используй очередь. На каждой итерации фиксируй текущий размер очереди, чтобы отделить один уровень от следующего.",
+    complexity: "O(n) по времени и O(w) по памяти, где w - максимальная ширина дерева.",
+    code: `function levelOrder(root) {
+  if (!root) return [];
 
-  for (let i = 0; i < nums.length; i += 1) {
-    // Текущее число закрывает все меньшие элементы на вершине стека.
-    while (stack.length && nums[i] > nums[stack[stack.length - 1]]) {
-      const index = stack.pop();
-      answer[index] = nums[i];
+  const result = [];
+  const queue = [root];
+  let head = 0;
+
+  while (head < queue.length) {
+    const levelSize = queue.length - head;
+    const level = [];
+
+    for (let i = 0; i < levelSize; i += 1) {
+      const node = queue[head];
+      head += 1;
+      level.push(node.val);
+
+      if (node.left) queue.push(node.left);
+      if (node.right) queue.push(node.right);
     }
 
-    // Текущий индекс ждёт свой будущий больший элемент.
-    stack.push(i);
+    result.push(level);
   }
 
-  return answer;
+  return result;
 }`,
     problems: [
-      "Next Greater Element I",
-      "Next Greater Element II",
-      "Daily Temperatures",
-      "Largest Rectangle in Histogram",
+      "Binary Tree Level Order Traversal",
+      "Binary Tree Zigzag Level Order Traversal",
+      "Minimum Depth of Binary Tree",
+      "Average of Levels in Binary Tree",
     ],
   },
   {
-    title: "Top K элементов",
-    visual: "top-k",
-    signal: "Нужно найти K крупнейших, K наименьших, K частых элементов или рейтинг в потоке.",
+    title: "Обход дерева в глубину",
+    visual: "tree-dfs",
+    signal:
+      "Нужно пройти путь от корня к листу, собрать суммы путей, проверить свойство поддерева или вычислить ответ снизу вверх.",
     approach:
-      "Держи только K кандидатов в куче или сортируй, если вход маленький и важнее простота.",
-    complexity: "Куча O(n log k), память O(k). Сортировка O(n log n).",
-    code: `function topKBySorting(nums, k) {
-  // Пример: nums = [3, 2, 1, 5, 6, 4], k = 2.
-  // Для небольших входов сортировка проще и хорошо читается.
-  return nums
-    .slice() // копируем, чтобы не менять исходный массив
-    .sort((a, b) => b - a) // большие элементы идут первыми
-    .slice(0, k); // берём ровно k лучших кандидатов
+      "Выбери preorder, inorder или postorder под задачу. В рекурсию передавай текущее состояние пути, а при выходе откатывай изменения.",
+    complexity: "O(n) по времени и O(h) по стеку рекурсии, где h - высота дерева.",
+    code: `function hasPathSum(root, targetSum) {
+  if (!root) return false;
+
+  const rest = targetSum - root.val;
+
+  if (!root.left && !root.right) {
+    return rest === 0;
+  }
+
+  return hasPathSum(root.left, rest) || hasPathSum(root.right, rest);
 }`,
-    problems: [
-      "Kth Largest Element in an Array",
-      "Top K Frequent Elements",
-      "Merge k Sorted Lists",
-      "Find K Pairs with Smallest Sums",
-    ],
+    problems: ["Path Sum", "Path Sum II", "Diameter of Binary Tree", "Binary Tree Maximum Path Sum"],
   },
   {
-    title: "Пересекающиеся интервалы",
-    visual: "intervals",
-    signal: "Нужно объединить, вставить, посчитать ресурсы или убрать конфликты между диапазонами.",
-    approach: "Отсортируй по началу, затем сравнивай текущий интервал с последним добавленным.",
-    complexity: "O(n log n) из-за сортировки, O(n) памяти на результат.",
-    code: `function mergeIntervals(intervals) {
-  // Пример: [[1,3], [2,6], [8,10]] -> [[1,6], [8,10]].
-  // Сортировка гарантирует, что потенциальное пересечение может быть
-  // только с последним интервалом в результате.
-  intervals.sort((a, b) => a[0] - b[0]);
-  const merged = [];
+    title: "Две кучи",
+    visual: "two-heaps",
+    signal:
+      "Нужно быстро получать медиану, балансировать две половины данных или поддерживать поток чисел в отсортированном виде.",
+    approach:
+      "Держи меньшую половину в max-heap, большую в min-heap. После каждой вставки балансируй размеры, чтобы медиана была на вершине.",
+    complexity: "Вставка O(log n), чтение медианы O(1), память O(n).",
+    code: `class Heap {
+  constructor(compare) {
+    this.data = [];
+    this.compare = compare;
+  }
 
-  for (const interval of intervals) {
-    const last = merged[merged.length - 1];
+  peek() {
+    return this.data[0];
+  }
 
-    // Если результата ещё нет или пересечения нет, начинаем новый интервал.
-    if (!last || last[1] < interval[0]) {
-      merged.push(interval);
-    } else {
-      // Иначе расширяем правую границу последнего интервала.
-      last[1] = Math.max(last[1], interval[1]);
+  push(value) {
+    this.data.push(value);
+    this.bubbleUp(this.data.length - 1);
+  }
+
+  pop() {
+    const top = this.data[0];
+    const last = this.data.pop();
+    if (this.data.length) {
+      this.data[0] = last;
+      this.bubbleDown(0);
+    }
+    return top;
+  }
+
+  bubbleUp(index) {
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (!this.compare(this.data[index], this.data[parent])) break;
+      [this.data[index], this.data[parent]] = [this.data[parent], this.data[index]];
+      index = parent;
     }
   }
 
-  return merged;
+  bubbleDown(index) {
+    while (true) {
+      let best = index;
+      const left = index * 2 + 1;
+      const right = index * 2 + 2;
+
+      if (left < this.data.length && this.compare(this.data[left], this.data[best])) best = left;
+      if (right < this.data.length && this.compare(this.data[right], this.data[best])) best = right;
+      if (best === index) break;
+
+      [this.data[index], this.data[best]] = [this.data[best], this.data[index]];
+      index = best;
+    }
+  }
+}
+
+class MedianFinder {
+  constructor() {
+    this.small = new Heap((a, b) => a > b); // max-heap
+    this.large = new Heap((a, b) => a < b); // min-heap
+  }
+
+  addNum(num) {
+    if (this.small.peek() === undefined || num <= this.small.peek()) this.small.push(num);
+    else this.large.push(num);
+
+    if (this.small.data.length > this.large.data.length + 1) this.large.push(this.small.pop());
+    if (this.large.data.length > this.small.data.length) this.small.push(this.large.pop());
+  }
+
+  findMedian() {
+    if (this.small.data.length === this.large.data.length) {
+      return (this.small.peek() + this.large.peek()) / 2;
+    }
+
+    return this.small.peek();
+  }
 }`,
-    problems: [
-      "Merge Intervals",
-      "Insert Interval",
-      "Non-overlapping Intervals",
-      "Single-Threaded CPU",
-    ],
+    problems: ["Find Median from Data Stream", "Sliding Window Median", "IPO"],
+  },
+  {
+    title: "Подмножества",
+    visual: "subsets",
+    signal:
+      "Нужно сгенерировать все комбинации, перестановки, варианты регистра, скобочные последовательности или все возможные решения.",
+    approach:
+      "Строй дерево решений. На каждом шаге добавляй один выбор в path, рекурсивно продолжай, затем откатывай выбор.",
+    complexity:
+      "Обычно O(2^n) или O(n!) по времени, потому что нужно явно построить все варианты; память зависит от размера ответа.",
+    code: `function subsets(nums) {
+  const result = [];
+  const path = [];
+
+  function backtrack(index) {
+    if (index === nums.length) {
+      result.push([...path]);
+      return;
+    }
+
+    backtrack(index + 1);
+
+    path.push(nums[index]);
+    backtrack(index + 1);
+    path.pop();
+  }
+
+  backtrack(0);
+  return result;
+}`,
+    problems: ["Subsets", "Subsets II", "Permutations", "Letter Case Permutation", "Generate Parentheses"],
   },
   {
     title: "Модифицированный бинарный поиск",
     visual: "binary-search",
     signal:
-      "Отсортированные данные, повёрнутый массив, поиск границы или поиск по пространству ответа.",
-    approach: "Сведи задачу к условию true/false и сужай диапазон вокруг этой границы.",
+      "Данные отсортированы, почти отсортированы, повернуты, бесконечны или ответ можно искать как границу между false и true.",
+    approach:
+      "Сформулируй условие, которое монотонно меняется. Затем сужай диапазон, сохраняя сторону, где может лежать ответ.",
     complexity: "O(log n) по времени и O(1) по памяти.",
-    code: `function firstTrue(left, right, condition) {
-  // Пример: ищем первый индекс, где nums[i] >= target.
-  // condition(mid) отвечает: "mid уже достаточно правый?"
+    code: `function firstGreaterOrEqual(nums, target) {
+  let left = 0;
+  let right = nums.length;
+
   while (left < right) {
     const mid = left + Math.floor((right - left) / 2);
 
-    if (condition(mid)) {
-      // mid подходит, значит ответ может быть mid или левее.
+    if (nums[mid] >= target) {
       right = mid;
     } else {
-      // mid не подходит, значит ответ строго правее.
       left = mid + 1;
     }
   }
@@ -312,195 +551,156 @@ const patterns: Pattern[] = [
   return left;
 }`,
     problems: [
+      "Binary Search",
       "Search in Rotated Sorted Array",
       "Find Minimum in Rotated Sorted Array",
-      "Find First and Last Position of Element in Sorted Array",
-      "Search a 2D Matrix II",
+      "Search a 2D Matrix",
     ],
   },
   {
-    title: "Обход бинарного дерева",
-    visual: "tree",
-    signal: "Нужно посетить все узлы в preorder, inorder, postorder или по уровням.",
-    approach: "Выбирай DFS для структурной рекурсии или BFS, когда важны уровни.",
-    complexity: "O(n) по времени; память зависит от глубины рекурсии или ширины очереди.",
-    code: `function inorder(root, output = []) {
-  // Пример BST: [2, 1, 3] при inorder даст [1, 2, 3].
-  // Inorder сначала обходит левое поддерево, потом корень, потом правое.
-  if (!root) return output;
-
-  inorder(root.left, output);
-  output.push(root.val); // здесь "посещаем" текущий узел
-  inorder(root.right, output);
-
-  return output;
-}`,
-    problems: [
-      "Binary Tree Level Order Traversal",
-      "Maximum Depth of Binary Tree",
-      "Construct Binary Tree from Preorder and Inorder Traversal",
-      "Binary Tree Maximum Path Sum",
-    ],
-  },
-  {
-    title: "Поиск в глубину",
-    visual: "dfs",
-    signal: "Нужно исследовать пути, компоненты, зависимости или все достижимые состояния.",
-    approach:
-      "Иди глубоко через рекурсию или стек и отмечай посещённые узлы, чтобы не зациклиться.",
-    complexity: "O(V + E) для графов; O(n) для деревьев.",
-    code: `function dfs(graph, start, seen = new Set()) {
-  // Пример: graph = { A: ["B", "C"], B: ["D"], C: [], D: [] }.
-  // DFS сначала уходит как можно глубже по одной ветке.
-  if (seen.has(start)) return [];
-
-  seen.add(start); // защищаемся от циклов
-  const order = [start]; // фиксируем порядок посещения
-
-  for (const next of graph[start] ?? []) {
-    // Рекурсивно добавляем все достижимые вершины из соседа.
-    order.push(...dfs(graph, next, seen));
-  }
-
-  return order;
-}`,
-    problems: ["Clone Graph", "Path Sum II", "Course Schedule II", "Number of Islands"],
-  },
-  {
-    title: "Поиск в ширину",
-    visual: "bfs",
-    signal: "Кратчайший путь в невзвешенном графе или обработка структуры по уровням.",
-    approach: "Используй очередь: обработай текущий фронт и добавь следующий.",
-    complexity: "O(V + E) для графов; O(n) для деревьев.",
-    code: `function bfs(graph, start) {
-  // Пример: ищем порядок обхода от вершины A.
-  // Queue хранит вершины текущего и следующих уровней.
-  const queue = [start];
-  const seen = new Set([start]);
-  const order = [];
-
-  for (let i = 0; i < queue.length; i += 1) {
-    const node = queue[i];
-    order.push(node);
-
-    for (const next of graph[node] ?? []) {
-      if (!seen.has(next)) {
-        seen.add(next); // добавляем один раз, чтобы не ходить по кругу
-        queue.push(next); // попадёт в обработку после текущего уровня
-      }
-    }
-  }
-
-  return order;
-}`,
-    problems: ["Word Ladder", "Rotting Oranges", "Binary Tree Level Order Traversal"],
-  },
-  {
-    title: "Обход матрицы",
-    visual: "matrix",
-    signal: "2D-сетки, острова, заливка, кратчайший путь или маркировка областей.",
-    approach: "Считай клетки узлами графа и ходи по валидным соседям через DFS или BFS.",
-    complexity: "O(rows * cols) по времени и памяти в худшем случае.",
-    code: `const directions = [
-  [1, 0],  // вниз
-  [-1, 0], // вверх
-  [0, 1],  // вправо
-  [0, -1], // влево
-];
-
-function neighbors(row, col, grid) {
-  // Пример: из клетки (1, 1) проверяем четыре соседние клетки.
-  // grid[r]?.[c] защищает от выхода за границы матрицы.
-  return directions
-    .map(([dr, dc]) => [row + dr, col + dc])
-    .filter(([r, c]) => grid[r]?.[c] !== undefined);
-}`,
-    problems: ["Flood Fill", "Number of Islands", "Surrounded Regions"],
-  },
-  {
-    title: "Бэктрекинг",
-    visual: "backtracking",
+    title: "Top K элементов",
+    visual: "top-k",
     signal:
-      "Нужно перебрать все валидные выборы, перестановки, комбинации или раскладки с ограничениями.",
-    approach: "Сделай выбор, уйди в рекурсию, затем откати выбор перед следующей веткой.",
-    complexity: "Часто экспоненциальная; память - глубина рекурсии плюс размер ответа.",
-    code: `function subsets(nums) {
-  // Пример: nums = [1, 2] -> [], [2], [1], [1, 2].
-  // path хранит текущий частичный выбор.
-  const result = [];
-  const path = [];
-
-  function search(index) {
-    if (index === nums.length) {
-      result.push([...path]); // копируем, потому что path будет меняться
-      return;
-    }
-
-    // Ветка 1: не берём nums[index].
-    search(index + 1);
-
-    // Ветка 2: берём nums[index], затем откатываем выбор.
-    path.push(nums[index]);
-    search(index + 1);
-    path.pop();
-  }
-
-  search(0);
-  return result;
-}`,
-    problems: ["Permutations", "Subsets", "N-Queens"],
-  },
-  {
-    title: "Динамическое программирование",
-    visual: "dp",
-    signal:
-      "Есть пересекающиеся подзадачи: максимум/минимум, количество способов или состояние возможно/невозможно.",
-    approach: "Сначала зафиксируй состояние, переход, базовые случаи и порядок обхода.",
-    complexity: "Обычно O(количество состояний * стоимость перехода).",
-    code: `function climbStairs(n) {
-  // Пример: n = 5. На последнюю ступень можно прийти с n-1 или n-2.
-  // curr хранит способов для текущей ступени, prev - для предыдущей.
-  let prev = 1; // способов добраться до ступени 0
-  let curr = 1; // способов добраться до ступени 1
-
-  for (let step = 2; step <= n; step += 1) {
-    // Переход: dp[step] = dp[step - 1] + dp[step - 2].
-    const next = prev + curr;
-    prev = curr;
-    curr = next;
-  }
-
-  return curr;
-}`,
-    problems: [
-      "Climbing Stairs",
-      "House Robber",
-      "Coin Change",
-      "Longest Common Subsequence",
-      "Longest Increasing Subsequence",
-      "Partition Equal Subset Sum",
-    ],
-  },
-  {
-    title: "Битовые операции",
-    visual: "bits",
-    signal: "Флаги, чётность, подмножества как маски, XOR-пары или низкоуровневый подсчёт.",
+      "Нужно найти k самых больших, маленьких, частых или близких элементов, а весь отсортированный список не нужен.",
     approach:
-      "Используй сдвиги, маски и свойства XOR, чтобы компактно хранить состояние или убирать дубликаты.",
-    complexity: "Часто O(n) по времени и O(1) по памяти.",
-    code: `function singleNumber(nums) {
-  // Пример: [4, 1, 2, 1, 2] -> 4.
-  // XOR одинаковых чисел даёт 0, а x ^ 0 снова даёт x.
-  let answer = 0;
+      "Держи в куче только k лучших кандидатов. Если новый элемент лучше худшего в куче, замени его.",
+    complexity: "O(n log k) по времени и O(k) по памяти.",
+    code: `function topKFrequent(nums, k) {
+  const frequency = new Map();
 
   for (const num of nums) {
-    // Парные значения взаимно уничтожаются.
-    answer ^= num;
+    frequency.set(num, (frequency.get(num) ?? 0) + 1);
   }
 
-  return answer;
+  // Для простоты примера сортируем пары. В больших входах вместо этого держат min-heap размера k.
+  return [...frequency.entries()]
+    .sort((left, right) => right[1] - left[1])
+    .slice(0, k)
+    .map(([num]) => num);
 }`,
-    problems: ["Single Number", "Number of 1 Bits", "Counting Bits", "Missing Number"],
+    problems: [
+      "Kth Largest Element in an Array",
+      "Top K Frequent Elements",
+      "K Closest Points to Origin",
+      "Reorganize String",
+    ],
+  },
+  {
+    title: "K-way merge",
+    visual: "k-way",
+    signal:
+      "Есть несколько отсортированных массивов, списков или потоков, и нужно слить их, найти k-й элемент или минимальный диапазон.",
+    approach:
+      "Положи первый элемент каждого источника в min-heap. Каждый раз доставай минимум и добавляй следующий элемент из того же источника.",
+    complexity: "O(n log k) по времени и O(k) по памяти, где k - число источников.",
+    code: `function mergeSortedArrays(arrays) {
+  const heap = [];
+  const result = [];
+
+  const higher = (a, b) => a.value < b.value;
+
+  function push(item) {
+    heap.push(item);
+    let index = heap.length - 1;
+
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (!higher(heap[index], heap[parent])) break;
+      [heap[index], heap[parent]] = [heap[parent], heap[index]];
+      index = parent;
+    }
+  }
+
+  function pop() {
+    const top = heap[0];
+    const last = heap.pop();
+
+    if (heap.length > 0) {
+      heap[0] = last;
+      let index = 0;
+
+      while (true) {
+        let best = index;
+        const left = index * 2 + 1;
+        const right = index * 2 + 2;
+
+        if (left < heap.length && higher(heap[left], heap[best])) best = left;
+        if (right < heap.length && higher(heap[right], heap[best])) best = right;
+        if (best === index) break;
+
+        [heap[index], heap[best]] = [heap[best], heap[index]];
+        index = best;
+      }
+    }
+
+    return top;
+  }
+
+  for (let list = 0; list < arrays.length; list += 1) {
+    if (arrays[list].length > 0) {
+      push({ value: arrays[list][0], list, index: 0 });
+    }
+  }
+
+  while (heap.length > 0) {
+    const item = pop();
+    result.push(item.value);
+
+    const nextIndex = item.index + 1;
+    if (nextIndex < arrays[item.list].length) {
+      push({
+        value: arrays[item.list][nextIndex],
+        list: item.list,
+        index: nextIndex,
+      });
+    }
+  }
+
+  return result;
+}`,
+    problems: [
+      "Merge k Sorted Lists",
+      "Find K Pairs with Smallest Sums",
+      "Kth Smallest Element in a Sorted Matrix",
+      "Smallest Range Covering Elements from K Lists",
+    ],
+  },
+  {
+    title: "Топологическая сортировка",
+    visual: "topological",
+    signal:
+      "Есть зависимости: курсы, задачи, сборка модулей, порядок букв или проверка, можно ли выполнить все элементы без циклов.",
+    approach:
+      "Построй граф зависимостей и indegree. В очередь положи вершины без входящих ребер, затем постепенно снимай зависимости.",
+    complexity: "O(V + E) по времени и O(V + E) по памяти.",
+    code: `function canFinishCourses(courseCount, prerequisites) {
+  const graph = Array.from({ length: courseCount }, () => []);
+  const indegree = Array(courseCount).fill(0);
+
+  for (const [course, dependency] of prerequisites) {
+    graph[dependency].push(course);
+    indegree[course] += 1;
+  }
+
+  const queue = [];
+  for (let course = 0; course < courseCount; course += 1) {
+    if (indegree[course] === 0) queue.push(course);
+  }
+
+  let visited = 0;
+  for (let head = 0; head < queue.length; head += 1) {
+    const course = queue[head];
+    visited += 1;
+
+    for (const next of graph[course]) {
+      indegree[next] -= 1;
+      if (indegree[next] === 0) queue.push(next);
+    }
+  }
+
+  return visited === courseCount;
+}`,
+    problems: ["Course Schedule", "Course Schedule II", "Minimum Height Trees"],
   },
 ];
 
@@ -607,131 +807,129 @@ function PatternCodeBlock({ code, title }: { code: string; title: string }) {
 
 function PatternVisual({ type, title }: { type: PatternVisualType; title: string }) {
   const cells = [0, 1, 2, 3, 4, 5];
+  const animatedCell = (
+    <circle fill="var(--lc-success)" r="5">
+      <animate attributeName="opacity" dur="1.6s" repeatCount="indefinite" values="0.25;1;0.25" />
+    </circle>
+  );
 
-  if (type === "tree") {
+  if (type === "tree-bfs" || type === "tree-dfs") {
+    const path = type === "tree-bfs" ? "M64 56h112M86 84h68" : "M120 24L80 56L56 84";
+
     return (
       <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
         <title>{title}</title>
         <path
-          d="M120 28L72 62M120 28l48 34M72 62l-28 28M72 62l28 28M168 62l-28 28M168 62l28 28"
+          d="M120 24L80 56M120 24l40 32M80 56L56 84M80 56l28 28M160 56l-28 28M160 56l28 28"
           stroke="var(--lc-border-strong)"
           strokeWidth="3"
         />
-        {[120, 72, 168, 44, 100, 140, 196].map((x, index) => (
-          <circle
-            key={x}
-            cx={x}
-            cy={index === 0 ? 28 : index < 3 ? 62 : 90}
-            fill={index === 0 ? "var(--lc-success)" : "var(--lc-active)"}
-            r="13"
-            stroke="var(--lc-border-strong)"
-          />
-        ))}
-      </svg>
-    );
-  }
-
-  if (type === "matrix") {
-    return (
-      <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
-        <title>{title}</title>
-        {Array.from({ length: 4 }).map((_, row) =>
-          Array.from({ length: 6 }).map((__, col) => (
-            <rect
-              key={`${row}-${col}`}
-              fill={row === 1 && col > 1 && col < 5 ? "var(--lc-success-soft)" : "var(--lc-active)"}
-              height="18"
-              rx="4"
-              stroke="var(--lc-border-strong)"
-              width="24"
-              x={42 + col * 26}
-              y={18 + row * 20}
-            />
-          )),
-        )}
-        <path d="M95 47h52M121 25v45" stroke="var(--lc-success)" strokeWidth="3" />
-      </svg>
-    );
-  }
-
-  if (type === "dfs" || type === "bfs" || type === "backtracking") {
-    const stroke = type === "bfs" ? "var(--lc-warning)" : "var(--lc-success)";
-
-    return (
-      <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
-        <title>{title}</title>
-        <path
-          d="M54 56h50l38-28h44M104 56l38 28h44"
-          stroke="var(--lc-border-strong)"
-          strokeWidth="3"
-        />
-        <path
-          d={type === "bfs" ? "M54 56h50M142 28h44M142 84h44" : "M54 56h50l38-28h44"}
-          fill="none"
-          stroke={stroke}
-          strokeLinecap="round"
-          strokeWidth="5"
-        />
-        {[54, 104, 142, 186, 142, 186].map((x, index) => (
+        <path d={path} fill="none" stroke="var(--lc-success)" strokeLinecap="round" strokeWidth="5" />
+        {[120, 80, 160, 56, 108, 132, 188].map((x, index) => (
           <circle
             key={`${x}-${index}`}
             cx={x}
-            cy={index < 2 ? 56 : index < 4 ? 28 : 84}
-            fill="var(--lc-active)"
+            cy={index === 0 ? 24 : index < 3 ? 56 : 84}
+            fill={index === 0 ? "var(--lc-success-soft)" : "var(--lc-active)"}
             r="12"
             stroke="var(--lc-border-strong)"
           />
         ))}
-        {type === "backtracking" ? (
-          <path d="M186 28l-20 20M166 28l20 20" stroke="var(--lc-danger-strong)" strokeWidth="3" />
-        ) : null}
       </svg>
     );
   }
 
-  if (type === "dp") {
+  if (type === "two-heaps") {
     return (
       <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
         <title>{title}</title>
-        {cells.map((cell) => (
+        <path
+          d="M76 32L48 64M76 32l28 32M164 32l-28 32M164 32l28 32"
+          stroke="var(--lc-border-strong)"
+          strokeWidth="3"
+        />
+        {[76, 48, 104, 164, 136, 192].map((x, index) => (
+          <circle
+            key={`${x}-${index}`}
+            cx={x}
+            cy={index === 0 || index === 3 ? 32 : 64}
+            fill={index < 3 ? "var(--lc-success-soft)" : "var(--lc-active)"}
+            r="13"
+            stroke="var(--lc-border-strong)"
+          />
+        ))}
+        <path d="M114 48h12" stroke="var(--lc-warning)" strokeLinecap="round" strokeWidth="4" />
+      </svg>
+    );
+  }
+
+  if (type === "subsets") {
+    return (
+      <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
+        <title>{title}</title>
+        <path
+          d="M120 20L78 50M120 20l42 30M78 50L52 82M78 50l26 32M162 50l-26 32M162 50l26 32"
+          stroke="var(--lc-border-strong)"
+          strokeWidth="3"
+        />
+        {[120, 78, 162, 52, 104, 136, 188].map((x, index) => (
           <rect
-            key={cell}
-            fill={cell < 4 ? "var(--lc-success-soft)" : "var(--lc-active)"}
-            height="30"
+            key={`${x}-${index}`}
+            fill={index % 2 === 0 ? "var(--lc-success-soft)" : "var(--lc-active)"}
+            height="20"
             rx="5"
             stroke="var(--lc-border-strong)"
             width="28"
-            x={35 + cell * 31}
-            y="42"
+            x={x - 14}
+            y={index === 0 ? 10 : index < 3 ? 40 : 72}
           />
         ))}
-        <path
-          d="M50 36c24-20 52-20 76 0M84 78c24 20 52 20 76 0"
-          fill="none"
-          stroke="var(--lc-success)"
-          strokeWidth="3"
-        />
       </svg>
     );
   }
 
-  if (type === "bits") {
+  if (type === "k-way" || type === "topological") {
     return (
       <svg className="h-28 w-full rounded-lg bg-[var(--lc-code)]" role="img" viewBox="0 0 240 112">
         <title>{title}</title>
-        {["1", "0", "1", "1", "0", "0", "1"].map((bit, index) => (
-          <text
-            key={`${bit}-${index}`}
-            fill={index % 2 === 0 ? "var(--lc-success)" : "var(--lc-muted)"}
-            fontFamily="monospace"
-            fontSize="24"
-            x={42 + index * 23}
-            y="60"
-          >
-            {bit}
-          </text>
-        ))}
-        <path d="M62 76h110" stroke="var(--lc-border-strong)" strokeWidth="3" />
+        {type === "k-way" ? (
+          <>
+            {[24, 52, 80].map((y, row) =>
+              [0, 1, 2].map((col) => (
+                <rect
+                  key={`${row}-${col}`}
+                  fill={col === 0 ? "var(--lc-success-soft)" : "var(--lc-active)"}
+                  height="16"
+                  rx="4"
+                  stroke="var(--lc-border-strong)"
+                  width="24"
+                  x={42 + col * 28}
+                  y={y}
+                />
+              )),
+            )}
+            <path d="M132 32h54M132 60h54M132 88h54" stroke="var(--lc-success)" strokeWidth="3" />
+          </>
+        ) : (
+          <>
+            <path
+              d="M46 56h52M98 56l42-30M98 56l42 30M140 26h54M140 86h54"
+              fill="none"
+              stroke="var(--lc-border-strong)"
+              strokeWidth="3"
+            />
+            {[46, 98, 140, 194, 140, 194].map((x, index) => (
+              <circle
+                key={`${x}-${index}`}
+                cx={x}
+                cy={index < 2 ? 56 : index < 4 ? 26 : 86}
+                fill={index < 3 ? "var(--lc-success-soft)" : "var(--lc-active)"}
+                r="12"
+                stroke="var(--lc-border-strong)"
+              />
+            ))}
+          </>
+        )}
       </svg>
     );
   }
@@ -744,8 +942,8 @@ function PatternVisual({ type, title }: { type: PatternVisualType; title: string
           key={cell}
           fill={
             (type === "window" && cell >= 1 && cell <= 3) ||
-            (type === "prefix" && cell <= 3) ||
-            (type === "binary-search" && cell >= 2 && cell <= 4)
+            (type === "binary-search" && cell >= 2 && cell <= 4) ||
+            (type === "cyclic" && cell === 2)
               ? "var(--lc-success-soft)"
               : "var(--lc-active)"
           }
@@ -757,6 +955,10 @@ function PatternVisual({ type, title }: { type: PatternVisualType; title: string
           y="42"
         />
       ))}
+
+      {type === "window" ? (
+        <rect fill="none" height="40" rx="7" stroke="var(--lc-success)" strokeWidth="3" width="95" x="58" y="36" />
+      ) : null}
       {type === "pointers" ? (
         <>
           <path d="M45 34v-14M45 20h147M192 20v14" stroke="var(--lc-success)" strokeWidth="3" />
@@ -767,18 +969,6 @@ function PatternVisual({ type, title }: { type: PatternVisualType; title: string
             R
           </text>
         </>
-      ) : null}
-      {type === "window" ? (
-        <rect
-          fill="none"
-          height="40"
-          rx="7"
-          stroke="var(--lc-success)"
-          strokeWidth="3"
-          width="95"
-          x="58"
-          y="36"
-        />
       ) : null}
       {type === "fast-slow" ? (
         <>
@@ -792,41 +982,20 @@ function PatternVisual({ type, title }: { type: PatternVisualType; title: string
           </text>
         </>
       ) : null}
+      {type === "intervals" ? (
+        <>
+          <rect fill="var(--lc-success-soft)" height="10" rx="5" width="76" x="48" y="30" />
+          <rect fill="var(--lc-success-soft)" height="10" rx="5" width="86" x="96" y="54" />
+          <rect fill="var(--lc-active)" height="10" rx="5" width="48" x="154" y="78" />
+        </>
+      ) : null}
+      {type === "cyclic" ? (
+        <path d="M72 32c26-22 70-22 96 0M168 32l-12-2M168 32l-5-11" fill="none" stroke="var(--lc-success)" strokeWidth="3" />
+      ) : null}
       {type === "reverse" ? (
         <>
           <path d="M178 32L70 32" stroke="var(--lc-success)" strokeWidth="3" />
           <path d="M70 32l11-7M70 32l11 7" stroke="var(--lc-success)" strokeWidth="3" />
-        </>
-      ) : null}
-      {type === "stack" ? (
-        <>
-          {[0, 1, 2, 3].map((level) => (
-            <rect
-              key={level}
-              fill={level < 3 ? "var(--lc-success-soft)" : "var(--lc-active)"}
-              height="15"
-              rx="3"
-              stroke="var(--lc-border-strong)"
-              width="58"
-              x="91"
-              y={72 - level * 16}
-            />
-          ))}
-        </>
-      ) : null}
-      {type === "top-k" ? (
-        <path
-          d="M64 78l56-58 56 58z"
-          fill="var(--lc-success-soft)"
-          stroke="var(--lc-success)"
-          strokeWidth="3"
-        />
-      ) : null}
-      {type === "intervals" ? (
-        <>
-          <rect fill="var(--lc-success-soft)" height="10" rx="5" width="76" x="48" y="32" />
-          <rect fill="var(--lc-success-soft)" height="10" rx="5" width="86" x="96" y="52" />
-          <rect fill="var(--lc-active)" height="10" rx="5" width="48" x="154" y="72" />
         </>
       ) : null}
       {type === "binary-search" ? (
@@ -835,9 +1004,10 @@ function PatternVisual({ type, title }: { type: PatternVisualType; title: string
           <path d="M117 27v54" stroke="var(--lc-warning)" strokeWidth="3" />
         </>
       ) : null}
-      {type === "prefix" ? (
-        <path d="M45 80h115" stroke="var(--lc-success)" strokeWidth="4" />
+      {type === "top-k" ? (
+        <path d="M64 82l56-58 56 58z" fill="var(--lc-success-soft)" stroke="var(--lc-success)" strokeWidth="3" />
       ) : null}
+      {type === "window" ? <g transform="translate(74 30)">{animatedCell}</g> : null}
     </svg>
   );
 }
@@ -861,7 +1031,7 @@ function ProblemLink({
 
   return (
     <Button
-      className="max-w-full justify-start border-[var(--lc-border)] bg-[var(--lc-panel)] px-2 py-1 text-left text-xs text-[var(--lc-text-strong)]"
+      className="max-w-full justify-start border-[var(--lc-border)] bg-[var(--lc-panel)] px-2 py-1 text-left text-xs text-[var(--lc-text-strong)] transition-colors hover:border-[#d4af37] hover:shadow-[0_0_0_1px_#d4af37]"
       size="xs"
       title={`Открыть задачу ${problem.title}`}
       variant="outline"
@@ -881,6 +1051,7 @@ export function PatternGuide({
   onSelectProblem: (problemId: string) => void;
 }) {
   const lookup = useMemo(() => buildProblemLookup(problems), [problems]);
+  const practiceCount = patterns.reduce((total, pattern) => total + pattern.problems.length, 0);
 
   return (
     <div className="space-y-4">
@@ -889,16 +1060,16 @@ export function PatternGuide({
           Гайд MedikCode по паттернам
         </div>
         <p className="mb-3 text-sm leading-6 text-[var(--lc-muted)]">
-          Документация по основным паттернам решения алгоритмических задач. Кратко объясняет, когда
-          применять каждый подход, какие признаки искать в условии и на какие встроенные задачи
-          можно опереться для практики.
+          Русская адаптация 14 паттернов из статьи HackerNoon: как распознать тип задачи, какой
+          прием применить и на каких задачах закрепить навык. Тексты и примеры здесь написаны
+          заново под локальный тренажер.
         </p>
         <div className="flex flex-wrap gap-2 text-xs">
           <span className="rounded-md border border-[var(--lc-border)] px-2 py-1 text-[var(--lc-muted)]">
-            16 паттернов
+            14 паттернов
           </span>
           <span className="rounded-md border border-[var(--lc-border)] px-2 py-1 text-[var(--lc-muted)]">
-            60 задач для практики
+            {practiceCount} задач для практики
           </span>
         </div>
       </header>
@@ -908,10 +1079,19 @@ export function PatternGuide({
           key={pattern.title}
           className="rounded-lg border border-[var(--lc-border)] bg-[var(--lc-panel-raised)] p-4"
         >
+          {(() => {
+            const articleDetails = articlePatternDetails[pattern.title];
+
+            return (
           <div className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)]">
             <PatternVisual title={pattern.title} type={pattern.visual} />
 
             <div className="min-w-0">
+              {articleDetails ? (
+                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--lc-muted)]">
+                  {articleDetails.original}
+                </div>
+              ) : null}
               <h2 className="mb-2 text-base font-semibold text-[var(--lc-text-strong)]">
                 {pattern.title}
               </h2>
@@ -929,8 +1109,25 @@ export function PatternGuide({
                   <dd className="text-[var(--lc-muted)]">{pattern.complexity}</dd>
                 </div>
               </dl>
+              {articleDetails ? (
+                <div className="mt-3 border-t border-[var(--lc-border)] pt-3">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--lc-muted)]">
+                    Как мыслить на интервью
+                  </div>
+                  <ul className="space-y-1 text-sm leading-6 text-[var(--lc-muted)]">
+                    {articleDetails.details.map((detail) => (
+                      <li key={detail} className="flex gap-2">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--lc-success)]" />
+                        <span>{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           </div>
+            );
+          })()}
 
           <PatternCodeBlock code={pattern.code} title={pattern.title} />
 

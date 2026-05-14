@@ -122,8 +122,39 @@ function compareNamedOutput(output, expected, judgeMode) {
   );
 }
 
-function compareRunOutput(output, expected, judgeMode) {
+function compareRemoveElementOutput(output, expected) {
+  if (!expected.hasReturn || !compareValues(output.returnValue, expected.returnValue, "exact")) {
+    return false;
+  }
+
+  const expectedLength = expected.returnValue;
+  const outputField = output.fields.find((field) => field.name === "nums");
+  const expectedField = expected.fields.find((field) => field.name === "nums");
+
+  if (
+    !Number.isInteger(expectedLength) ||
+    expectedLength < 0 ||
+    !Array.isArray(outputField?.value) ||
+    !Array.isArray(expectedField?.value) ||
+    outputField.value.length < expectedLength ||
+    expectedField.value.length < expectedLength
+  ) {
+    return false;
+  }
+
+  return compareValues(
+    outputField.value.slice(0, expectedLength),
+    expectedField.value.slice(0, expectedLength),
+    "unordered-array",
+  );
+}
+
+function compareRunOutput(output, expected, judgeMode, functionName) {
   if (expected.kind === "named") {
+    if (functionName === "removeElement") {
+      return compareRemoveElementOutput(output, expected);
+    }
+
     return compareNamedOutput(output, expected, judgeMode);
   }
 
@@ -219,7 +250,12 @@ async function runJavaScriptUserCode(request) {
         [parsedInput.values, transformedInput, output],
         compiled.memoryTracker.readBytes(),
       );
-      const passed = compareRunOutput(normalizedOutput, expected, request.judgeMode);
+      const passed = compareRunOutput(
+        normalizedOutput,
+        expected,
+        request.judgeMode,
+        request.functionName,
+      );
       cases.push({
         id: testCase.id,
         name: `Case ${index + 1}`,
@@ -316,7 +352,12 @@ async function runPythonUserCode(request) {
           parsedInput.values,
           normalizedOutput,
         ]);
-        const passed = compareRunOutput(normalizedOutput, expected, request.judgeMode);
+        const passed = compareRunOutput(
+          normalizedOutput,
+          expected,
+          request.judgeMode,
+          request.functionName,
+        );
 
         cases.push({
           id: testCase.id,

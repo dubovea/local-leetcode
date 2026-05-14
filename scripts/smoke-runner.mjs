@@ -79,6 +79,44 @@ const wrongAnswer = await runUserCode({
 
 assert(wrongAnswer.status === "wrong-answer", `expected wrong-answer, got ${wrongAnswer.status}`);
 
+const removeElementAccepted = await runUserCode({
+  code: `/**
+ * @param {number[]} nums
+ * @param {number} val
+ * @return {number}
+ */
+var removeElement = function (nums, val) {
+  let k = 0;
+
+  for (let i = 0; i < nums.length; i += 1) {
+    if (nums[i] !== val) {
+      nums[k] = nums[i];
+      k += 1;
+    }
+  }
+
+  for (let i = k; i < nums.length; i += 1) {
+    nums[i] = undefined;
+  }
+
+  return k;
+};`,
+  functionName: "removeElement",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: "nums = [0,1,2,2,3,0,4,2], val = 2",
+      expected: "5, nums = [0,1,4,0,3,_,_,_]",
+    },
+  ],
+});
+
+assert(
+  removeElementAccepted.status === "accepted",
+  `expected Remove Element custom judge accepted, got ${removeElementAccepted.status}`,
+);
+
 const busyAccepted = await runUserCode({
   code: `var spin = function () {
   const startedAt = performance.now();
