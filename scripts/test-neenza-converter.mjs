@@ -146,5 +146,9 @@ assert(
     'operations = ["LRUCache","put","get"], arguments = [[2],[1,1],[1]]',
   "design inputs should be normalized into operations and arguments",
 );
+assert(
+  designProblem.testCases[0].expected === "[null,null,1]",
+  "design expected output should be parsed from example",
+);
 
 console.log("Neenza converter test passed");

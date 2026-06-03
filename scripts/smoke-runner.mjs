@@ -165,6 +165,190 @@ assert(
   `expected linked-list solution accepted, got ${linkedListAccepted.status}`,
 );
 
+const mergeTwoListsAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} list1
+ * @param {ListNode} list2
+ * @return {ListNode}
+ */
+var mergeTwoLists = function (list1, list2) {
+  const dummy = new ListNode();
+  let current = dummy;
+  let p1 = list1;
+  let p2 = list2;
+
+  while (p1 && p2) {
+    if (p1.val < p2.val) {
+      current.next = p1;
+      p1 = p1.next;
+    } else {
+      current.next = p2;
+      p2 = p2.next;
+    }
+
+    current = current.next;
+  }
+
+  current.next = p1 ?? p2;
+  return dummy.next;
+};`,
+  functionName: "mergeTwoLists",
+  judgeMode: "exact",
+  testCases: [
+    { id: "1", input: "list1 = [1,2,4], list2 = [1,3,4]", expected: "[1,1,2,3,4,4]" },
+    { id: "2", input: "list1 = [], list2 = []", expected: "[]" },
+    { id: "3", input: "list1 = [], list2 = [0]", expected: "[0]" },
+  ],
+});
+
+assert(
+  mergeTwoListsAccepted.status === "accepted",
+  `expected Merge Two Sorted Lists accepted, got ${mergeTwoListsAccepted.status}`,
+);
+
+const linkedListCycleAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} head
+ * @return {boolean}
+ */
+var hasCycle = function (head) {
+  let slow = head;
+  let fast = head;
+
+  while (fast && fast.next) {
+    slow = slow.next;
+    fast = fast.next.next;
+
+    if (slow === fast) {
+      return true;
+    }
+  }
+
+  return false;
+};`,
+  functionName: "hasCycle",
+  judgeMode: "exact",
+  testCases: [
+    { id: "1", input: "head = [3,2,0,-4], pos = 1", expected: "true" },
+    { id: "2", input: "head = [1,2], pos = 0", expected: "true" },
+    { id: "3", input: "head = [1], pos = -1", expected: "false" },
+  ],
+});
+
+assert(
+  linkedListCycleAccepted.status === "accepted",
+  `expected Linked List Cycle accepted, got ${linkedListCycleAccepted.status}`,
+);
+
+const linkedListCycleTwoAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} head
+ * @return {ListNode}
+ */
+var detectCycle = function (head) {
+  let slow = head;
+  let fast = head;
+
+  while (fast && fast.next) {
+    slow = slow.next;
+    fast = fast.next.next;
+
+    if (slow === fast) {
+      let current = head;
+
+      while (current !== slow) {
+        current = current.next;
+        slow = slow.next;
+      }
+
+      return current;
+    }
+  }
+
+  return null;
+};`,
+  functionName: "detectCycle",
+  judgeMode: "exact",
+  testCases: [
+    { id: "1", input: "head = [3,2,0,-4], pos = 1", expected: "tail connects to node index 1" },
+    { id: "2", input: "head = [1,2], pos = 0", expected: "tail connects to node index 0" },
+    { id: "3", input: "head = [1], pos = -1", expected: "no cycle" },
+    { id: "4", input: "head = [], pos = -1", expected: "no cycle" },
+  ],
+});
+
+assert(
+  linkedListCycleTwoAccepted.status === "accepted",
+  `expected Linked List Cycle II accepted, got ${linkedListCycleTwoAccepted.status}`,
+);
+
+const intersectionAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} headA
+ * @param {ListNode} headB
+ * @return {ListNode}
+ */
+var getIntersectionNode = function (headA, headB) {
+  const seen = new Set();
+
+  while (headA) {
+    seen.add(headA);
+    headA = headA.next;
+  }
+
+  while (headB) {
+    if (seen.has(headB)) {
+      return headB;
+    }
+
+    headB = headB.next;
+  }
+
+  return null;
+};`,
+  functionName: "getIntersectionNode",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: "intersectVal = 8, listA = [4,1,8,4,5], listB = [5,6,1,8,4,5], skipA = 2, skipB = 3",
+      expected: "Intersected at '8'",
+    },
+    {
+      id: "2",
+      input: "intersectVal = 0, listA = [2,6,4], listB = [1,5], skipA = 3, skipB = 2",
+      expected: "No intersection",
+    },
+  ],
+});
+
+assert(
+  intersectionAccepted.status === "accepted",
+  `expected intersection linked-list case accepted, got ${intersectionAccepted.status}`,
+);
+
+const deleteNodeAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} node
+ * @return {void}
+ */
+var deleteNode = function (node) {
+  node.val = node.next.val;
+  node.next = node.next.next;
+};`,
+  functionName: "deleteNode",
+  judgeMode: "exact",
+  testCases: [
+    { id: "1", input: "head = [4,5,1,9], node = 5", expected: "[4,1,9]" },
+    { id: "2", input: "head = [4,5,1,9], node = 1", expected: "[4,5,9]" },
+  ],
+});
+
+assert(
+  deleteNodeAccepted.status === "accepted",
+  `expected delete-node linked-list case accepted, got ${deleteNodeAccepted.status}`,
+);
+
 const treeAccepted = await runUserCode({
   code: `/**
  * @param {TreeNode} root
@@ -322,6 +506,54 @@ var copyRandomList = function (head) {
 assert(
   randomListAccepted.status === "accepted",
   `expected random-list solution accepted, got ${randomListAccepted.status}`,
+);
+
+const multilevelDoublyListAccepted = await runUserCode({
+  code: `/**
+ * @param {Node} head
+ * @return {Node}
+ */
+var flatten = function (head) {
+  let current = head;
+  const stack = [];
+
+  while (current) {
+    if (current.child) {
+      if (current.next) {
+        stack.push(current.next);
+      }
+
+      current.next = current.child;
+      current.next.prev = current;
+      current.child = null;
+    }
+
+    if (!current.next && stack.length > 0) {
+      current.next = stack.pop();
+      current.next.prev = current;
+    }
+
+    current = current.next;
+  }
+
+  return head;
+};`,
+  functionName: "flatten",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: "head = [1,2,3,4,5,6,null,null,null,7,8,9,10,null,null,11,12]",
+      expected: "[1,2,3,7,8,11,12,9,10,4,5,6]",
+    },
+    { id: "2", input: "head = [1,2,null,3]", expected: "[1,3,2]" },
+    { id: "3", input: "head = []", expected: "[]" },
+  ],
+});
+
+assert(
+  multilevelDoublyListAccepted.status === "accepted",
+  `expected multilevel doubly linked-list solution accepted, got ${multilevelDoublyListAccepted.status}`,
 );
 
 const naryAccepted = await runUserCode({
@@ -500,6 +732,118 @@ Counter.prototype.get = function () {
 assert(
   designAccepted.status === "accepted",
   `expected design/class case accepted, got ${designAccepted.status}`,
+);
+
+const linkedListDesignAccepted = await runUserCode({
+  code: `var MyLinkedList = function () {
+  this.head = null;
+  this.size = 0;
+};
+
+MyLinkedList.prototype.get = function (index) {
+  if (index < 0 || index >= this.size) return -1;
+  let current = this.head;
+
+  for (let i = 0; i < index; i += 1) {
+    current = current.next;
+  }
+
+  return current.val;
+};
+
+MyLinkedList.prototype.addAtHead = function (val) {
+  this.addAtIndex(0, val);
+};
+
+MyLinkedList.prototype.addAtTail = function (val) {
+  this.addAtIndex(this.size, val);
+};
+
+MyLinkedList.prototype.addAtIndex = function (index, val) {
+  if (index < 0 || index > this.size) return;
+
+  this.size += 1;
+
+  if (index === 0) {
+    this.head = { val, next: this.head };
+    return;
+  }
+
+  let previous = this.head;
+
+  for (let i = 0; i < index - 1; i += 1) {
+    previous = previous.next;
+  }
+
+  previous.next = { val, next: previous.next };
+};
+
+MyLinkedList.prototype.deleteAtIndex = function (index) {
+  if (index < 0 || index >= this.size) return;
+
+  if (index === 0) {
+    this.head = this.head.next;
+  } else {
+    let previous = this.head;
+
+    for (let i = 0; i < index - 1; i += 1) {
+      previous = previous.next;
+    }
+
+    previous.next = previous.next.next;
+  }
+
+  this.size -= 1;
+};`,
+  functionName: "MyLinkedList",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: 'operations = ["MyLinkedList", "addAtHead", "addAtTail", "addAtIndex", "get", "deleteAtIndex", "get"], arguments = [[], [1], [3], [1, 2], [1], [1], [1]]',
+      expected: "[null, null, null, null, 2, null, 3]",
+    },
+  ],
+});
+
+assert(
+  linkedListDesignAccepted.status === "accepted",
+  `expected Design Linked List accepted, got ${linkedListDesignAccepted.status}`,
+);
+
+const randomNodeDesignAccepted = await runUserCode({
+  code: `/**
+ * @param {ListNode} head
+ */
+var Solution = function (head) {
+  this.values = [];
+
+  while (head) {
+    this.values.push(head.val);
+    head = head.next;
+  }
+};
+
+/**
+ * @return {number}
+ */
+Solution.prototype.getRandom = function () {
+  return this.values[0];
+};`,
+  functionName: "Solution",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: 'operations = ["Solution", "getRandom", "getRandom", "getRandom", "getRandom", "getRandom"], arguments = [[[1, 2, 3]], [], [], [], [], []]',
+      expected: "[null, 1, 3, 2, 2, 3]",
+    },
+  ],
+});
+
+assert(
+  randomNodeDesignAccepted.status === "accepted",
+  `expected linked-list random-node design case accepted, got ${randomNodeDesignAccepted.status}`,
 );
 
 for (const language of ["c-wasm", "csharp-wasm", "cpp-wasm", "go-wasm"]) {

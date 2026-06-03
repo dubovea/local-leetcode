@@ -42,7 +42,7 @@ function unsupportedWasmLanguageResult(request) {
   };
 }
 
-function readDesignCase(parsedInput) {
+function readDesignCase(parsedInput, functionName) {
   const operationsIndex = parsedInput.names.findIndex((name) =>
     ["operations", "methods", "actions"].includes(name),
   );
@@ -55,8 +55,12 @@ function readDesignCase(parsedInput) {
 
   if (
     Array.isArray(operations) &&
+    operations.length > 0 &&
     operations.every((operation) => typeof operation === "string") &&
-    Array.isArray(args)
+    operations[0] === functionName &&
+    Array.isArray(args) &&
+    args.length === operations.length &&
+    args.every((item) => Array.isArray(item))
   ) {
     return { operations, args };
   }
@@ -149,7 +153,43 @@ function compareRemoveElementOutput(output, expected) {
   );
 }
 
-function compareRunOutput(output, expected, judgeMode, functionName) {
+function compareRandomDesignOutput(output, expected, designCase) {
+  if (
+    !designCase ||
+    designCase.operations[0] !== "Solution" ||
+    !designCase.operations.includes("getRandom")
+  ) {
+    return null;
+  }
+
+  const values = designCase.args[0]?.[0];
+
+  if (!Array.isArray(values) || !Array.isArray(output) || expected.kind !== "value") {
+    return null;
+  }
+
+  const expectedValues = expected.value;
+
+  if (!Array.isArray(expectedValues) || output.length !== expectedValues.length) {
+    return false;
+  }
+
+  return output.every((item, index) => {
+    if (designCase.operations[index] !== "getRandom") {
+      return compareValues(item, expectedValues[index], "exact");
+    }
+
+    return values.some((value) => compareValues(item, value, "exact"));
+  });
+}
+
+function compareRunOutput(output, expected, judgeMode, functionName, designCase) {
+  const randomDesignResult = compareRandomDesignOutput(output, expected, designCase);
+
+  if (typeof randomDesignResult === "boolean") {
+    return randomDesignResult;
+  }
+
   if (expected.kind === "named") {
     if (functionName === "removeElement") {
       return compareRemoveElementOutput(output, expected);
@@ -176,7 +216,7 @@ function buildJavaScriptCaseOutput({ expected, output, parsedInput, transformedI
     return buildNamedOutput(expected, returnValue, serializedInput);
   }
 
-  return designCase ? output : transformOutputJS(output, code, transformedInput[0]);
+  return designCase ? output : transformOutputJS(output, code, transformedInput[0], parsedInput.names);
 }
 
 function serializePythonArg(compiled, arg, kind) {
@@ -223,7 +263,7 @@ async function runJavaScriptUserCode(request) {
       activeLogs = caseLogs;
       const parsedInput = parseInputAssignments(testCase.input);
       const expected = parseExpectedOutput(testCase.expected);
-      const designCase = readDesignCase(parsedInput);
+      const designCase = readDesignCase(parsedInput, request.functionName);
       const transformedInput = transformInputJS(
         parsedInput.values,
         request.code,
@@ -255,6 +295,7 @@ async function runJavaScriptUserCode(request) {
         expected,
         request.judgeMode,
         request.functionName,
+        designCase,
       );
       cases.push({
         id: testCase.id,

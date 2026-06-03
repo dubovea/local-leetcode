@@ -184,6 +184,59 @@ export function arrayToLinkedList(array) {
   return dummy.next;
 }
 
+function setHiddenProperty(target, name, value) {
+  if (target && typeof target === "object") {
+    Object.defineProperty(target, name, {
+      configurable: true,
+      value,
+    });
+  }
+}
+
+function linkedListNodes(head) {
+  const nodes = [];
+  const seen = new Set();
+  let current = head;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    nodes.push(current);
+    current = current.next;
+  }
+
+  return nodes;
+}
+
+export function arrayToLinkedListWithCycle(array, pos) {
+  const head = arrayToLinkedList(array);
+  const cycleIndex = Number(pos);
+
+  if (!head) {
+    return head;
+  }
+
+  const nodes = linkedListNodes(head);
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    setHiddenProperty(nodes[index], "__runnerListIndex", index);
+    setHiddenProperty(nodes[index], "__runnerCycleInput", true);
+  }
+
+  if (!Number.isInteger(cycleIndex) || cycleIndex < 0) {
+    return head;
+  }
+
+  const cycleNode = nodes[cycleIndex];
+
+  if (!cycleNode) {
+    return head;
+  }
+
+  nodes[nodes.length - 1].next = cycleNode;
+
+  return head;
+}
+
 export function linkedListToArray(head) {
   const result = [];
   const seen = new Set();
@@ -196,6 +249,123 @@ export function linkedListToArray(head) {
   }
 
   return result;
+}
+
+export function arrayToMultilevelDoublyList(array) {
+  if (!Array.isArray(array) || array.length === 0) {
+    return null;
+  }
+
+  const segments = [];
+  const gaps = [];
+  let currentSegment = [];
+  let nullCount = 0;
+
+  for (const value of array) {
+    if (value === null || typeof value === "undefined") {
+      if (currentSegment.length > 0) {
+        segments.push(currentSegment);
+        currentSegment = [];
+      }
+
+      nullCount += 1;
+      continue;
+    }
+
+    if (nullCount > 0) {
+      gaps.push(nullCount);
+      nullCount = 0;
+    }
+
+    currentSegment.push(value);
+  }
+
+  if (currentSegment.length > 0) {
+    segments.push(currentSegment);
+  }
+
+  const levels = segments.map((segment) => {
+    const nodes = segment.map((value) => new Node(value));
+
+    for (let index = 0; index < nodes.length; index += 1) {
+      nodes[index].prev = nodes[index - 1] ?? null;
+      nodes[index].next = nodes[index + 1] ?? null;
+    }
+
+    return nodes;
+  });
+
+  for (let index = 1; index < levels.length; index += 1) {
+    const parentLevel = levels[index - 1];
+    const parent = parentLevel[(gaps[index - 1] ?? 1) - 1];
+
+    if (parent) {
+      parent.child = levels[index][0] ?? null;
+      if (parent.child) {
+        parent.child.prev = null;
+      }
+    }
+  }
+
+  return levels[0]?.[0] ?? null;
+}
+
+export function multilevelDoublyListToArray(head) {
+  const result = [];
+  const seen = new Set();
+  let current = head;
+
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    result.push(current.val);
+    current = current.next;
+  }
+
+  return result;
+}
+
+export function linkedListNodeIndex(node) {
+  return Number.isInteger(node?.__runnerListIndex) ? node.__runnerListIndex : null;
+}
+
+export function findLinkedListNode(head, value) {
+  return linkedListNodes(head).find((node) => node.val === value) ?? null;
+}
+
+export function arrayToIntersectingLinkedLists(listA, listB, skipA, skipB, intersectVal) {
+  const headA = arrayToLinkedList(listA);
+  const headB = arrayToLinkedList(listB);
+  const shouldIntersect = Number(intersectVal) !== 0;
+
+  setHiddenProperty(headA, "__runnerIntersectionHead", true);
+  setHiddenProperty(headB, "__runnerIntersectionHead", true);
+
+  if (!shouldIntersect) {
+    return { headA, headB, intersectionNode: null };
+  }
+
+  const nodesA = linkedListNodes(headA);
+  const nodesB = linkedListNodes(headB);
+  const intersectionNode = nodesA[Number(skipA)];
+
+  if (!intersectionNode) {
+    return { headA, headB, intersectionNode: null };
+  }
+
+  setHiddenProperty(intersectionNode, "__runnerIntersectionNode", true);
+
+  if (Number(skipB) === 0) {
+    setHiddenProperty(intersectionNode, "__runnerIntersectionHead", true);
+    return { headA, headB: intersectionNode, intersectionNode };
+  }
+
+  const previousB = nodesB[Number(skipB) - 1];
+
+  if (previousB) {
+    previousB.next = intersectionNode;
+  }
+
+  return { headA, headB, intersectionNode };
 }
 
 export function arrayToRandomList(array) {

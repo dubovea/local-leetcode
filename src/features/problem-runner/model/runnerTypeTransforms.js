@@ -3,9 +3,12 @@ import {
   arrayToBinaryTree,
   arrayToEmployees,
   arrayToGraph,
+  arrayToIntersectingLinkedLists,
   arrayToIterator,
+  arrayToLinkedListWithCycle,
   arrayToLinkedList,
   arrayToMountainArray,
+  arrayToMultilevelDoublyList,
   arrayToNaryTree,
   arrayToNestedInteger,
   arrayToQuadTree,
@@ -13,7 +16,10 @@ import {
   binaryTreeToArray,
   binaryTreeNextToArray,
   graphToArray,
+  findLinkedListNode,
+  linkedListNodeIndex,
   linkedListToArray,
+  multilevelDoublyListToArray,
   naryTreeToArray,
   nestedIntegerToValue,
   quadTreeToArray,
@@ -86,6 +92,10 @@ export function getStructuredKind(type, code) {
 
     if (code.includes("children")) {
       return "nary-tree";
+    }
+
+    if (code.includes("prev") && code.includes("child")) {
+      return "multilevel-doubly-list";
     }
 
     if (code.includes("next") && code.includes("left") && code.includes("right")) {
@@ -229,6 +239,8 @@ function transformStructuredValue(value, type, code) {
   switch (structuredKind) {
     case "linked-list":
       return arrayToLinkedList(value);
+    case "multilevel-doubly-list":
+      return arrayToMultilevelDoublyList(value);
     case "binary-tree":
       return arrayToBinaryTree(value);
     case "binary-tree-next":
@@ -258,6 +270,67 @@ function transformStructuredValue(value, type, code) {
   return value;
 }
 
+function createDeleteNodeInput(value, namedValues) {
+  if (!namedValues.has("head") || !namedValues.has("node")) {
+    return null;
+  }
+
+  const head = arrayToLinkedList(namedValues.get("head"));
+  const targetNode = findLinkedListNode(head, namedValues.get("node"));
+
+  if (!targetNode) {
+    return null;
+  }
+
+  Object.defineProperty(targetNode, "__runnerHead", {
+    configurable: true,
+    value: head,
+  });
+
+  return targetNode;
+}
+
+function createLinkedListInput(value, hint, namedValues) {
+  if (
+    hint.name === "node" &&
+    namedValues.has("head") &&
+    !Array.isArray(value) &&
+    typeof value !== "object"
+  ) {
+    const targetNode = createDeleteNodeInput(value, namedValues);
+
+    if (targetNode) {
+      return targetNode;
+    }
+  }
+
+  if (namedValues.has("pos") && (hint.name === "head" || !namedValues.has(hint.name))) {
+    return arrayToLinkedListWithCycle(value, namedValues.get("pos"));
+  }
+
+  return transformStructuredValue(value, hint.type, "");
+}
+
+function createIntersectionInput(namedValues) {
+  if (
+    !namedValues.has("listA") ||
+    !namedValues.has("listB") ||
+    !namedValues.has("skipA") ||
+    !namedValues.has("skipB") ||
+    !namedValues.has("intersectVal")
+  ) {
+    return null;
+  }
+
+  return arrayToIntersectingLinkedLists(
+    namedValues.get("listA"),
+    namedValues.get("listB"),
+    namedValues.get("skipA"),
+    namedValues.get("skipB"),
+    namedValues.get("intersectVal"),
+  );
+}
+
 function serializeStructuredValue(value, type, code) {
   const normalizedType = normalizeTypeName(type);
 
@@ -271,6 +344,8 @@ function serializeStructuredValue(value, type, code) {
   switch (getStructuredKind(normalizedType, code)) {
     case "linked-list":
       return linkedListToArray(value);
+    case "multilevel-doubly-list":
+      return multilevelDoublyListToArray(value);
     case "binary-tree":
       return binaryTreeToArray(value);
     case "binary-tree-next":
@@ -295,9 +370,12 @@ function serializeStructuredValue(value, type, code) {
 export function transformInputJS(values, code, names = []) {
   const typeHints = getJsTypeHints(code);
   const namedValues = new Map(names.map((name, index) => [name, values[index]]));
+  const intersectionInput = createIntersectionInput(namedValues);
 
   if (typeHints.params.length > 0 && names.length > 0) {
     return typeHints.params.map((hint, index) => {
+      const structuredKind = getStructuredKind(hint.type, code);
+
       if (getStructuredKind(hint.type, code) === "custom-function") {
         return valueToCustomFunction(namedValues.get(hint.name) ?? namedValues.get("function_id"));
       }
@@ -306,7 +384,21 @@ export function transformInputJS(values, code, names = []) {
         return valuesToMaster(namedValues.get("secret"), namedValues.get("allowedGuesses"));
       }
 
+      if (structuredKind === "linked-list" && intersectionInput) {
+        if (hint.name === "headA" || hint.name === "listA") {
+          return intersectionInput.headA;
+        }
+
+        if (hint.name === "headB" || hint.name === "listB") {
+          return intersectionInput.headB;
+        }
+      }
+
       const value = namedValues.has(hint.name) ? namedValues.get(hint.name) : values[index];
+
+      if (structuredKind === "linked-list") {
+        return createLinkedListInput(value, hint, namedValues);
+      }
 
       return transformStructuredValue(value, hint.type, code);
     });
@@ -316,7 +408,15 @@ export function transformInputJS(values, code, names = []) {
     const hint =
       typeHints.params.find((param) => param.name === names[index]) ?? typeHints.params[index];
 
-    return hint ? transformStructuredValue(value, hint.type, code) : value;
+    if (!hint) {
+      return value;
+    }
+
+    if (getStructuredKind(hint.type, code) === "linked-list") {
+      return createLinkedListInput(value, hint, namedValues);
+    }
+
+    return transformStructuredValue(value, hint.type, code);
   });
 }
 
@@ -335,10 +435,33 @@ export function serializeInputJS(values, code, names = []) {
   return { names: outputNames, values: outputValues };
 }
 
-export function transformOutputJS(value, code, fallbackValue) {
+export function transformOutputJS(value, code, fallbackValue, inputNames = []) {
   const { params, returnType } = getJsTypeHints(code);
+  const returnKind = getStructuredKind(returnType, code);
+
+  if (
+    (fallbackValue?.__runnerCycleInput || inputNames.includes("pos")) &&
+    returnKind === "linked-list"
+  ) {
+    return linkedListNodeIndex(value);
+  }
+
+  if (
+    (fallbackValue?.__runnerIntersectionHead || inputNames.includes("intersectVal")) &&
+    returnKind === "linked-list"
+  ) {
+    if (!value) {
+      return null;
+    }
+
+    return value.__runnerIntersectionNode ? value.val : linkedListToArray(value);
+  }
 
   if (returnType === "void") {
+    if (fallbackValue?.__runnerHead) {
+      return linkedListToArray(fallbackValue.__runnerHead);
+    }
+
     return typeof fallbackValue === "undefined"
       ? undefined
       : serializeStructuredValue(fallbackValue, params[0]?.type, code);

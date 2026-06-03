@@ -209,6 +209,33 @@ export function parseExpectedOutput(expectedText) {
     throw new Error("Expected a value, but got an empty string");
   }
 
+  const cycleNodeMatch = /^tail connects to node index\s+(-?\d+)$/i.exec(source);
+
+  if (cycleNodeMatch) {
+    return {
+      kind: "value",
+      value: Number(cycleNodeMatch[1]),
+    };
+  }
+
+  if (/^no cycle$/i.test(source) || /^no intersection$/i.test(source)) {
+    return {
+      kind: "value",
+      value: null,
+    };
+  }
+
+  const intersectionMatch = /^Intersected at ['"](.+)['"]$/i.exec(source);
+
+  if (intersectionMatch) {
+    const numericValue = Number(intersectionMatch[1]);
+
+    return {
+      kind: "value",
+      value: Number.isNaN(numericValue) ? intersectionMatch[1] : numericValue,
+    };
+  }
+
   const parts = splitTopLevelCommaList(source);
   const hasNamedPart = parts.some((part) => ASSIGNMENT_START_RE.test(part));
 
