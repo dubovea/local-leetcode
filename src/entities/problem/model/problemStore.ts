@@ -39,6 +39,8 @@ function getSeedProblems() {
   return [...generatedPatternProblems, ...generatedNeenzaProblems, ...defaultProblems];
 }
 
+const seedProblemsById = new Map(getSeedProblems().map((problem) => [problem.id, problem]));
+
 function readSelectedProblemId() {
   return (
     localStorage.getItem(SELECTED_PROBLEM_KEY) ?? localStorage.getItem(LEGACY_SELECTED_PROBLEM_KEY)
@@ -157,8 +159,31 @@ function buildBackup(problems: Problem[]): ProblemsBackup {
   return {
     version: 1,
     exportedAt: new Date().toISOString(),
-    problems: problems.map(normalizeProblem),
+    problems: problems.map(normalizeBackupProblem),
   };
+}
+
+function normalizeBackupProblem(problem: Problem): Problem {
+  const normalizedProblem = normalizeProblem(problem);
+  const seedProblem = seedProblemsById.get(normalizedProblem.id);
+
+  if (!seedProblem) {
+    return normalizedProblem;
+  }
+
+  const normalizedSeedProblem = normalizeProblem(seedProblem);
+
+  return normalizeProblem({
+    ...normalizedSeedProblem,
+    activeLanguage: normalizedProblem.activeLanguage,
+    code: normalizedProblem.code || normalizedSeedProblem.code,
+    codeByLanguage: {
+      ...(normalizedSeedProblem.codeByLanguage ?? {}),
+      ...(normalizedProblem.codeByLanguage ?? {}),
+    },
+    notesMarkdown: normalizedProblem.notesMarkdown ?? normalizedSeedProblem.notesMarkdown ?? "",
+    submissions: normalizedProblem.submissions ?? [],
+  });
 }
 
 type ProblemStore = {
@@ -486,7 +511,7 @@ export const useProblemStore = create<ProblemStore>((set, get) => ({
 
   async importBackup(backup) {
     const problems = Array.isArray(backup) ? backup : backup.problems;
-    const normalizedProblems = problems.map(normalizeProblem);
+    const normalizedProblems = problems.map(normalizeBackupProblem);
 
     await clearProblemsDb();
     await putProblemsToDb(normalizedProblems);
