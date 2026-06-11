@@ -136,6 +136,7 @@ def __medik_array_to_binary_tree(values, node_class=TreeNode):
     if not isinstance(values, list) or len(values) == 0 or values[0] is None:
         return None
     root = node_class(values[0])
+    root.__runner_binary_tree_node = True
     queue = [root]
     index = 1
     while queue and index < len(values):
@@ -144,6 +145,7 @@ def __medik_array_to_binary_tree(values, node_class=TreeNode):
         index += 1
         if left_value is not None:
             node.left = node_class(left_value)
+            node.left.__runner_binary_tree_node = True
             queue.append(node.left)
         if index >= len(values):
             break
@@ -151,8 +153,21 @@ def __medik_array_to_binary_tree(values, node_class=TreeNode):
         index += 1
         if right_value is not None:
             node.right = node_class(right_value)
+            node.right.__runner_binary_tree_node = True
             queue.append(node.right)
     return root
+
+def __medik_find_binary_tree_node(root, value):
+    queue = [root] if root is not None else []
+    while queue:
+        node = queue.pop(0)
+        if node is None:
+            continue
+        if node.val == value:
+            return node
+        queue.append(getattr(node, "left", None))
+        queue.append(getattr(node, "right", None))
+    return None
 
 def __medik_binary_tree_to_array(root):
     if root is None:
@@ -306,6 +321,8 @@ def __medik_serialize_value(value, kind):
         return __medik_linked_list_to_array(value)
     if kind == "binary-tree":
         return __medik_binary_tree_to_array(value)
+    if kind == "binary-tree-node":
+        return value.val if getattr(value, "__runner_binary_tree_node", False) else None
     if kind == "binary-tree-next":
         return __medik_binary_tree_next_to_array(value)
     if kind == "nary-tree":
@@ -388,8 +405,9 @@ __medik_solution
 
     const transformValue = pyodide.runPython("__medik_transform_value", { globals });
     const serializeValue = pyodide.runPython("__medik_serialize_value", { globals });
+    const findBinaryTreeNode = pyodide.runPython("__medik_find_binary_tree_node", { globals });
 
-    return { pyodide, globals, solution, transformValue, serializeValue };
+    return { pyodide, globals, solution, transformValue, serializeValue, findBinaryTreeNode };
   } catch (error) {
     destroyPyProxy(globals);
     throw error;

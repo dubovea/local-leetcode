@@ -381,6 +381,83 @@ assert(
   `expected tree solution accepted, got ${treeAccepted.status}`,
 );
 
+const lowestCommonAncestorAccepted = await runUserCode({
+  code: `/**
+ * @param {TreeNode} root
+ * @param {TreeNode} p
+ * @param {TreeNode} q
+ * @return {TreeNode}
+ */
+var lowestCommonAncestor = function (root, p, q) {
+  if (!root) {
+    return null;
+  }
+
+  if (root === p || root === q) {
+    return root;
+  }
+
+  const l = lowestCommonAncestor(root.left, p, q);
+  const r = lowestCommonAncestor(root.right, p, q);
+
+  if (l && r) {
+    return root;
+  }
+
+  return l || r || null;
+};`,
+  functionName: "lowestCommonAncestor",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 1",
+      expected: "3",
+    },
+    {
+      id: "2",
+      input: "root = [3,5,1,6,2,0,8,null,null,7,4], p = 5, q = 4",
+      expected: "5",
+    },
+  ],
+});
+
+assert(
+  lowestCommonAncestorAccepted.status === "accepted",
+  `expected Lowest Common Ancestor accepted, got ${lowestCommonAncestorAccepted.status}`,
+);
+
+const clonedTreeTargetAccepted = await runUserCode({
+  code: `/**
+ * @param {TreeNode} original
+ * @param {TreeNode} cloned
+ * @param {TreeNode} target
+ * @return {TreeNode}
+ */
+var getTargetCopy = function(original, cloned, target) {
+  if (!original || original === target) {
+    return cloned;
+  }
+
+  return getTargetCopy(original.left, cloned.left, target) ||
+    getTargetCopy(original.right, cloned.right, target);
+};`,
+  functionName: "getTargetCopy",
+  judgeMode: "exact",
+  testCases: [
+    {
+      id: "1",
+      input: "tree = [7,4,3,null,null,6,19], target = 3",
+      expected: "3",
+    },
+  ],
+});
+
+assert(
+  clonedTreeTargetAccepted.status === "accepted",
+  `expected cloned tree target accepted, got ${clonedTreeTargetAccepted.status}`,
+);
+
 const nextPointerAccepted = await runUserCode({
   code: `/**
  * @param {_Node} root

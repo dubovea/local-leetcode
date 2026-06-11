@@ -15,6 +15,7 @@ import {
   arrayToRandomList,
   binaryTreeToArray,
   binaryTreeNextToArray,
+  findBinaryTreeNode,
   graphToArray,
   findLinkedListNode,
   linkedListNodeIndex,
@@ -194,7 +195,9 @@ export function getPythonCallPlan(code, functionName, parsedInput) {
   }
 
   return typeHints.params.map((hint, index) => {
-    if (getStructuredKind(hint.type, code) === "custom-function") {
+    const structuredKind = getStructuredKind(hint.type, code);
+
+    if (structuredKind === "custom-function") {
       return {
         value: namedValues.get(hint.name) ?? namedValues.get("function_id"),
         kind: "custom-function",
@@ -202,7 +205,7 @@ export function getPythonCallPlan(code, functionName, parsedInput) {
       };
     }
 
-    if (getStructuredKind(hint.type, code) === "master") {
+    if (structuredKind === "master") {
       return {
         value: {
           secret: namedValues.get("secret"),
@@ -213,9 +216,22 @@ export function getPythonCallPlan(code, functionName, parsedInput) {
       };
     }
 
+    if (
+      structuredKind === "binary-tree" &&
+      !namedValues.has(hint.name) &&
+      ["original", "cloned", "root"].includes(hint.name) &&
+      namedValues.has("tree")
+    ) {
+      return {
+        value: namedValues.get("tree"),
+        kind: structuredKind,
+        name: hint.name,
+      };
+    }
+
     return {
       value: namedValues.has(hint.name) ? namedValues.get(hint.name) : parsedInput.values[index],
-      kind: getStructuredKind(hint.type, code),
+      kind: structuredKind,
       name: hint.name,
     };
   });
@@ -311,6 +327,46 @@ function createLinkedListInput(value, hint, namedValues) {
   return transformStructuredValue(value, hint.type, "");
 }
 
+function isBinaryTreeNodeReferenceValue(value) {
+  return value !== null && typeof value !== "undefined" && !Array.isArray(value) && typeof value !== "object";
+}
+
+function resolveBinaryTreeValue(values, index, hint, namedValues) {
+  if (namedValues.has(hint.name)) {
+    return namedValues.get(hint.name);
+  }
+
+  if (["original", "cloned", "root"].includes(hint.name) && namedValues.has("tree")) {
+    return namedValues.get("tree");
+  }
+
+  return values[index];
+}
+
+function getPrimaryBinaryTreeInput(binaryTreeInputs) {
+  return (
+    binaryTreeInputs.get("original") ??
+    binaryTreeInputs.get("root") ??
+    binaryTreeInputs.get("tree") ??
+    [...binaryTreeInputs.values()][0] ??
+    null
+  );
+}
+
+function createBinaryTreeInput(value, hint, binaryTreeInputs) {
+  if (isBinaryTreeNodeReferenceValue(value)) {
+    return findBinaryTreeNode(getPrimaryBinaryTreeInput(binaryTreeInputs), value);
+  }
+
+  const tree = arrayToBinaryTree(value);
+
+  if (Array.isArray(value)) {
+    binaryTreeInputs.set(hint.name, tree);
+  }
+
+  return tree;
+}
+
 function createIntersectionInput(namedValues) {
   if (
     !namedValues.has("listA") ||
@@ -371,6 +427,7 @@ export function transformInputJS(values, code, names = []) {
   const typeHints = getJsTypeHints(code);
   const namedValues = new Map(names.map((name, index) => [name, values[index]]));
   const intersectionInput = createIntersectionInput(namedValues);
+  const binaryTreeInputs = new Map();
 
   if (typeHints.params.length > 0 && names.length > 0) {
     return typeHints.params.map((hint, index) => {
@@ -400,6 +457,14 @@ export function transformInputJS(values, code, names = []) {
         return createLinkedListInput(value, hint, namedValues);
       }
 
+      if (structuredKind === "binary-tree") {
+        return createBinaryTreeInput(
+          resolveBinaryTreeValue(values, index, hint, namedValues),
+          hint,
+          binaryTreeInputs,
+        );
+      }
+
       return transformStructuredValue(value, hint.type, code);
     });
   }
@@ -414,6 +479,10 @@ export function transformInputJS(values, code, names = []) {
 
     if (getStructuredKind(hint.type, code) === "linked-list") {
       return createLinkedListInput(value, hint, namedValues);
+    }
+
+    if (getStructuredKind(hint.type, code) === "binary-tree") {
+      return createBinaryTreeInput(value, hint, binaryTreeInputs);
     }
 
     return transformStructuredValue(value, hint.type, code);
@@ -435,7 +504,16 @@ export function serializeInputJS(values, code, names = []) {
   return { names: outputNames, values: outputValues };
 }
 
-export function transformOutputJS(value, code, fallbackValue, inputNames = []) {
+export function expectsBinaryTreeNodeValue(expected) {
+  return (
+    expected?.kind === "value" &&
+    expected.value !== null &&
+    !Array.isArray(expected.value) &&
+    typeof expected.value !== "object"
+  );
+}
+
+export function transformOutputJS(value, code, fallbackValue, inputNames = [], expected) {
   const { params, returnType } = getJsTypeHints(code);
   const returnKind = getStructuredKind(returnType, code);
 
@@ -465,6 +543,10 @@ export function transformOutputJS(value, code, fallbackValue, inputNames = []) {
     return typeof fallbackValue === "undefined"
       ? undefined
       : serializeStructuredValue(fallbackValue, params[0]?.type, code);
+  }
+
+  if (returnKind === "binary-tree" && expectsBinaryTreeNodeValue(expected)) {
+    return value?.__runnerBinaryTreeNode ? value.val : null;
   }
 
   return serializeStructuredValue(value, returnType, code);

@@ -332,6 +332,10 @@ export function findLinkedListNode(head, value) {
   return linkedListNodes(head).find((node) => node.val === value) ?? null;
 }
 
+function markBinaryTreeNode(node) {
+  setHiddenProperty(node, "__runnerBinaryTreeNode", true);
+}
+
 export function arrayToIntersectingLinkedLists(listA, listB, skipA, skipB, intersectVal) {
   const headA = arrayToLinkedList(listA);
   const headB = arrayToLinkedList(listB);
@@ -408,6 +412,7 @@ export function arrayToBinaryTree(array, NodeClass = TreeNode) {
   }
 
   const root = new NodeClass(array[0]);
+  markBinaryTreeNode(root);
   const queue = [root];
   let index = 1;
 
@@ -423,6 +428,7 @@ export function arrayToBinaryTree(array, NodeClass = TreeNode) {
 
     if (leftValue !== null && typeof leftValue !== "undefined") {
       node.left = new NodeClass(leftValue);
+      markBinaryTreeNode(node.left);
       queue.push(node.left);
     }
 
@@ -435,11 +441,33 @@ export function arrayToBinaryTree(array, NodeClass = TreeNode) {
 
     if (rightValue !== null && typeof rightValue !== "undefined") {
       node.right = new NodeClass(rightValue);
+      markBinaryTreeNode(node.right);
       queue.push(node.right);
     }
   }
 
   return root;
+}
+
+export function findBinaryTreeNode(root, value) {
+  const queue = root ? [root] : [];
+
+  while (queue.length > 0) {
+    const node = queue.shift();
+
+    if (!node) {
+      continue;
+    }
+
+    if (Object.is(node.val, value)) {
+      return node;
+    }
+
+    queue.push(node.left ?? null);
+    queue.push(node.right ?? null);
+  }
+
+  return null;
 }
 
 export function binaryTreeToArray(root) {

@@ -10,6 +10,7 @@ import { maxCaseMemoryBytes, measureMemoryBytes, nowMs, readMemoryBytes } from "
 import { compareValues, createConsole, formatError, stringifyValue } from "./runnerValue.js";
 import { compileUserCode, executeDesignCase } from "./runnerJavaScript.js";
 import {
+  expectsBinaryTreeNodeValue,
   getPythonCallPlan,
   getPythonTypeHints,
   getStructuredKind,
@@ -211,12 +212,14 @@ function formatRunOutput(output, expected) {
 
 function buildJavaScriptCaseOutput({ expected, output, parsedInput, transformedInput, code, designCase }) {
   if (expected.kind === "named" && !designCase) {
-    const returnValue = transformOutputJS(output, code);
+    const returnValue = transformOutputJS(output, code, undefined, [], expected);
     const serializedInput = serializeInputJS(transformedInput, code, parsedInput.names);
     return buildNamedOutput(expected, returnValue, serializedInput);
   }
 
-  return designCase ? output : transformOutputJS(output, code, transformedInput[0], parsedInput.names);
+  return designCase
+    ? output
+    : transformOutputJS(output, code, transformedInput[0], parsedInput.names, expected);
 }
 
 function serializePythonArg(compiled, arg, kind) {
@@ -236,6 +239,20 @@ function serializePythonInput(compiled, args, callPlan) {
     names: callPlan.map((item) => item.name),
     values: callPlan.map((item, index) => serializePythonArg(compiled, args[index], item.kind)),
   };
+}
+
+function isBinaryTreeNodeReferenceValue(value) {
+  return value !== null && typeof value !== "undefined" && !Array.isArray(value) && typeof value !== "object";
+}
+
+function getPrimaryBinaryTreeArg(binaryTreeArgs) {
+  return (
+    binaryTreeArgs.get("original") ??
+    binaryTreeArgs.get("root") ??
+    binaryTreeArgs.get("tree") ??
+    [...binaryTreeArgs.values()][0] ??
+    null
+  );
 }
 
 async function runJavaScriptUserCode(request) {
@@ -359,6 +376,7 @@ async function runPythonUserCode(request) {
       let serializedOutputProxy;
       const args = [];
       const rawArgProxies = [];
+      const binaryTreeArgs = new Map();
 
       try {
         setPythonLogsTarget(caseLogs);
@@ -372,8 +390,20 @@ async function runPythonUserCode(request) {
 
         for (const item of callPlan) {
           const rawArg = compiled.pyodide.toPy(item.value);
+          let arg;
           rawArgProxies.push(rawArg);
-          args.push(item.kind ? compiled.transformValue(rawArg, item.kind) : rawArg);
+
+          if (item.kind === "binary-tree" && isBinaryTreeNodeReferenceValue(item.value)) {
+            arg = compiled.findBinaryTreeNode(getPrimaryBinaryTreeArg(binaryTreeArgs), rawArg);
+          } else {
+            arg = item.kind ? compiled.transformValue(rawArg, item.kind) : rawArg;
+
+            if (item.kind === "binary-tree" && Array.isArray(item.value)) {
+              binaryTreeArgs.set(item.name, arg);
+            }
+          }
+
+          args.push(arg);
         }
 
         const memoryStartedBytes = await readMemoryBytes();
@@ -382,7 +412,12 @@ async function runPythonUserCode(request) {
         durationMs = nowMs() - solutionStartedAt;
 
         serializedOutputProxy = returnKind
-          ? compiled.serializeValue(outputProxy, returnKind)
+          ? compiled.serializeValue(
+              outputProxy,
+              returnKind === "binary-tree" && expectsBinaryTreeNodeValue(expected)
+                ? "binary-tree-node"
+                : returnKind,
+            )
           : outputProxy;
         const output = pythonValueToJs(serializedOutputProxy);
         const normalizedOutput =
@@ -451,6 +486,7 @@ async function runPythonUserCode(request) {
     setPythonLogsTarget(null);
     destroyPyProxy(compiled.serializeValue);
     destroyPyProxy(compiled.transformValue);
+    destroyPyProxy(compiled.findBinaryTreeNode);
     destroyPyProxy(compiled.solution);
     destroyPyProxy(compiled.globals);
   }
